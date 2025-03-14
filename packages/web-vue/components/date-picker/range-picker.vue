@@ -2,12 +2,14 @@
   <Trigger
     v-if="!hideTrigger"
     trigger="click"
+    animation-name="slide-dynamic-origin"
+    auto-fit-transform-origin
     :click-to-close="false"
-    :popup-translate="[0, 4]"
+    :popup-offset="4"
     v-bind="triggerProps"
     :unmount-on-close="unmountOnClose"
     :position="position"
-    :disabled="triggerDisabled"
+    :disabled="triggerDisabled || readonly"
     :popup-visible="panelVisible"
     :popup-container="popupContainer"
     @popupVisibleChange="onPanelVisibleChange"
@@ -22,8 +24,8 @@
         :visible="panelVisible"
         :error="error"
         :disabled="disabled"
-        :editable="!readonly"
-        :allow-clear="allowClear"
+        :readonly="readonly || disabledInput"
+        :allow-clear="allowClear && !readonly"
         :placeholder="computedPlaceholder"
         :input-value="inputValue"
         :value="panelValue"
@@ -32,6 +34,9 @@
         @change="onInputChange"
         @pressEnter="onInputPressEnter"
       >
+        <template v-if="$slots.prefix" #prefix>
+          <slot name="prefix" />
+        </template>
         <template #suffix-icon>
           <slot name="suffix-icon">
             <IconCalendar />
@@ -55,17 +60,26 @@ import { Dayjs } from 'dayjs';
 import {
   computed,
   defineComponent,
+  inject,
   nextTick,
+  onUnmounted,
   PropType,
   reactive,
   ref,
   toRefs,
   watch,
+  watchEffect,
 } from 'vue';
 import { TimePickerProps } from '../time-picker/interface';
-import { DisabledTimeProps, RangePickerProps, ShortcutType } from './interface';
+import {
+  DisabledTimeProps,
+  ShortcutType,
+  CalendarValue,
+  WeekStart,
+  Mode,
+} from './interface';
 import { getPrefixCls } from '../_utils/global-config';
-import { isArray } from '../_utils/is';
+import { isArray, isBoolean } from '../_utils/is';
 import pick from '../_utils/pick';
 import { getFormattedValue, isValidInputValue } from '../time-picker/utils';
 import {
@@ -74,6 +88,7 @@ import {
   dayjs,
   getNow,
   getDateValue,
+  initializeDateLocale,
 } from '../_utils/date';
 import useState from '../_hooks/use-state';
 import {
@@ -84,7 +99,7 @@ import {
 import useFormat from './hooks/use-format';
 import useRangePickerState from './hooks/use-range-picker-state';
 import useRangeHeaderValue from './hooks/use-range-header-value';
-import Trigger from '../trigger';
+import Trigger, { TriggerProps } from '../trigger';
 import DateRangeInput from '../_components/picker/input-range.vue';
 import RangePickerPanel from './range-picker-panel.vue';
 import useRangeTimePickerValue from './hooks/use-range-time-picker-value';
@@ -93,6 +108,12 @@ import { omit } from '../_utils/omit';
 import useMergeState from '../_hooks/use-merge-state';
 import IconCalendar from '../icon/icon-calendar';
 import useProvideDatePickerTransform from './hooks/use-provide-datepicker-transform';
+import { EmitType } from '../_utils/types';
+import { getReturnRangeValue } from './hooks/use-value-format';
+import { Size } from '../_utils/constant';
+import { useFormItem } from '../_hooks/use-form-item';
+import { useI18n } from '../locale';
+import { configProviderInjectionKey } from '../config-provider/context';
 
 export default defineComponent({
   name: 'RangePicker',
@@ -149,20 +170,29 @@ export default defineComponent({
       default: false,
     },
     /**
-     * @zh 每周的第一天开始于周几，0 - 周日，1 - 周一。(默认0)
-     * @en The first day of the week starts on the day of the week, 0-Sunday, 1-Monday. (Default 0)
-     * @type number
+     * @zh 每周的第一天开始于周几，0 - 周日，1 - 周一，以此类推。
+     * @en The first day of the week starts on the day of the week, 0-Sunday, 1-Monday, and so on.
+     * @type 0 | 1 | 2 | 3 | 4 | 5 | 6
+     * @version 2-6 from 2.21.0
      */
     dayStartOfWeek: {
-      type: Number as PropType<0 | 1>,
+      type: Number as PropType<WeekStart>,
       default: 0,
     },
     /**
      * @zh 展示日期的格式，参考[字符串解析格式](#字符串解析格式)
-     * @en Display the format of the date, refer to [String Parsing Format](#String Parsing Format)
+     * @en Display the format of the date, refer to [String Parsing Format](#string-parsing-format)
      * */
     format: {
       type: String,
+    },
+    /**
+     * @zh 值的格式，对 `value` `defaultValue` `pickerValue` `defaultPickerValue` 以及事件中的返回值生效，支持设置为时间戳，Date 和字符串（参考[字符串解析格式](#字符串解析格式)）。如果没有指定，将格式化为字符串，格式同 `format`。
+     * @en The format of the value, valid for `value` `defaultValue` `pickerValue` `defaultPickerValue` and the return value in the event, supports setting as timestamp, Date and string (refer to [String parsing format](#string-parsing-format) ). If not specified, it will be formatted as a string, in the same format as `format`.
+     * @version 2.16.0
+     */
+    valueFormat: {
+      type: String as PropType<'timestamp' | 'Date' | string>,
     },
     /**
      * @zh 是否增加时间选择
@@ -210,10 +240,17 @@ export default defineComponent({
     separator: {
       type: String,
     },
+    /**
+     * @zh 时间是否会交换，默认情况下时间会影响和参与开始和结束值的排序，如果要固定时间顺序，可将其关闭。
+     * @en Whether the time will be exchanged, by default time will affect and participate in the ordering of start and end values, if you want to fix the time order, you can turn it off.
+     * @version 2.25.0
+     * */
+    exchangeTime: {
+      type: Boolean,
+      default: true,
+    },
     popupContainer: {
-      type: [String, Object] as PropType<
-        string | HTMLElement | null | undefined
-      >,
+      type: [String, Object] as PropType<string | HTMLElement>,
     },
     locale: {
       type: Object as PropType<Record<string, any>>,
@@ -232,8 +269,7 @@ export default defineComponent({
       type: Boolean,
     },
     size: {
-      type: String as PropType<'mini' | 'small' | 'medium' | 'large'>,
-      default: 'medium',
+      type: String as PropType<Size>,
     },
     shortcuts: {
       type: Array as PropType<ShortcutType[]>,
@@ -255,63 +291,123 @@ export default defineComponent({
       type: Boolean,
     },
     triggerProps: {
-      type: Object as PropType<Record<string, unknown>>,
+      type: Object as PropType<TriggerProps>,
     },
     unmountOnClose: {
       type: Boolean,
     },
+    previewShortcut: {
+      type: Boolean,
+      default: true,
+    },
+    showConfirmBtn: {
+      type: Boolean,
+    },
+    /**
+     * @zh 是否禁止键盘输入日期
+     * @en Whether input is disabled with the keyboard.
+     * @version 2.43.0
+     */
+    disabledInput: {
+      type: Boolean,
+      default: false,
+    },
+    /**
+     * @zh 是否启用缩写
+     * @en Whether to enable abbreviation
+     */
+    abbreviation: {
+      type: Boolean,
+      default: true,
+    },
   },
-  emits: [
+  emits: {
     /**
      * @zh 组件值发生改变
      * @en The component value changes
-     * @param {(string | undefined)[] | undefined} dateString
+     * @param {(Date | string | number | undefined)[] | undefined} value
      * @param {(Date | undefined)[] | undefined} date
+     * @param {(string | undefined)[] | undefined} dateString
      */
-    'change',
+    'change': (
+      value: (CalendarValue | undefined)[] | undefined,
+      date: (Date | undefined)[] | undefined,
+      dateString: (string | undefined)[] | undefined
+    ) => {
+      return true;
+    },
+    'update:modelValue': (value: (CalendarValue | undefined)[] | undefined) => {
+      return true;
+    },
     /**
      * @zh 选中日期发生改变但组件值未改变
      * @en The selected date has changed but the component value has not changed
-     * @param {(string | undefined)[]} dateString
+     * @param {(Date | string | number | undefined)[]} value
      * @param {(Date | undefined)[]} date
+     * @param {(string | undefined)[]} dateString
      */
-    'select',
-    'update:modelValue',
+    'select': (
+      value: (CalendarValue | undefined)[],
+      date: (Date | undefined)[],
+      dateString: (string | undefined)[]
+    ) => {
+      return true;
+    },
     /**
      * @zh 打开或关闭弹出框
      * @en Open or close the pop-up box
      * @param {boolean} visible
      */
-    'popup-visible-change',
-    'update:popupVisible',
+    'popup-visible-change': (visible: boolean) => {
+      return true;
+    },
+    'update:popupVisible': (visible: boolean) => {
+      return true;
+    },
     /**
      * @zh 点击确认按钮
      * @en Click the confirm button
-     * @param {string[]} dateString
+     * @param {Date | string | number[]} value
      * @param {Date[]} date
+     * @param {string[]} dateString
      */
-    'ok',
+    'ok': (value: CalendarValue[], date: Date[], dateString: string[]) => {
+      return true;
+    },
     /**
      * @zh 点击清除按钮
      * @en Click the clear button
      */
-    'clear',
+    'clear': () => {
+      return true;
+    },
     /**
      * @zh 点击快捷选项
      * @en Click on the shortcut option
      * @param {ShortcutType} shortcut
      */
-    'select-shortcut',
+    'select-shortcut': (shortcut: ShortcutType) => {
+      return true;
+    },
     /**
      * @zh 面板日期改变
      * @en Panel date change
-     * @param {string[]} dateString
+     * @param {Date | string | number[]} value
      * @param {Date[]} date
+     * @param {string[]} dateString
      */
-    'picker-value-change',
-    'update:pickerValue',
-  ],
-  setup(props: RangePickerProps, { emit, slots }) {
+    'picker-value-change': (
+      value: CalendarValue[],
+      date: Date[],
+      dateString: string[]
+    ) => {
+      return true;
+    },
+    'update:pickerValue': (value: CalendarValue[]) => {
+      return true;
+    },
+  },
+  setup(props, { emit, slots }) {
     const {
       mode,
       showTime,
@@ -328,7 +424,34 @@ export default defineComponent({
       locale,
       pickerValue,
       defaultPickerValue,
+      valueFormat,
+      size,
+      error,
+      dayStartOfWeek,
+      exchangeTime,
+      previewShortcut,
+      showConfirmBtn,
     } = toRefs(props);
+
+    const { locale: globalLocal } = useI18n();
+    const configCtx = inject(configProviderInjectionKey, undefined);
+    watchEffect(() => {
+      initializeDateLocale(globalLocal.value, dayStartOfWeek.value);
+    });
+
+    const mergedExchangeTime = computed(() => {
+      return !(!exchangeTime.value || !(configCtx?.exchangeTime ?? true));
+    });
+
+    const {
+      mergedSize,
+      mergedDisabled: formDisabled,
+      mergedError,
+      eventHandlers,
+    } = useFormItem({
+      size,
+      error,
+    });
 
     const datePickerT = useProvideDatePickerTransform(
       reactive({
@@ -351,20 +474,27 @@ export default defineComponent({
         (datePickerT('datePicker.rangePlaceholder.date') as unknown as string[])
     );
 
-    const computedFormat = useFormat(
+    const {
+      format: computedFormat,
+      valueFormat: returnValueFormat,
+      parseValueFormat,
+    } = useFormat(
       reactive({
         mode,
         format,
         showTime,
+        valueFormat,
       })
     );
 
     const disabledArray = computed(() => {
       const disabled0 =
         disabled.value === true ||
+        formDisabled.value ||
         (isArray(disabled.value) && disabled.value[0] === true);
       const disabled1 =
         disabled.value === true ||
+        formDisabled.value ||
         (isArray(disabled.value) && disabled.value[1] === true);
       return [disabled0, disabled1];
     });
@@ -387,32 +517,40 @@ export default defineComponent({
     const isNextDisabled = computed(
       () => disabledArray.value[focusedIndex.value ^ 1]
     );
-
+    // 选中值
     const { value: selectedValue, setValue: setSelectedValue } =
       useRangePickerState(
         reactive({
           modelValue,
           defaultValue,
-          format: computedFormat,
+          format: parseValueFormat,
         })
       );
-
+    // 操作值
     const [processValue, setProcessValue] = useState<
       Array<Dayjs | undefined> | undefined
     >();
-
+    // 预览值
     const [previewValue, setPreviewValue] = useState<
       Array<Dayjs | undefined> | undefined
     >();
-
+    // 待确认的选中值
+    const forSelectedValue = computed(
+      () => processValue.value ?? selectedValue.value
+    );
+    // 面板显示的值
     const panelValue = computed(
-      () => previewValue.value || processValue.value || selectedValue.value
+      () => previewValue.value ?? processValue.value ?? selectedValue.value
     );
 
     // input 操作的值
     const [inputValue, setInputValue] = useState<
       Array<string | undefined> | undefined
     >();
+
+    const startHeaderMode = ref<'year' | 'month' | undefined>();
+
+    const endHeaderMode = ref<'year' | 'month' | undefined>();
 
     const [panelVisible, setLocalPanelVisible] = useMergeState(
       defaultPopupVisible.value,
@@ -433,24 +571,59 @@ export default defineComponent({
       startHeaderOperations,
       endHeaderOperations,
       resetHeaderValue,
+      setHeaderValue,
     } = useRangeHeaderValue(
       reactive({
         mode,
+        startHeaderMode,
+        endHeaderMode,
         value: pickerValue,
         defaultValue: defaultPickerValue,
         selectedValue: panelValue,
-        format: computedFormat,
+        format: parseValueFormat,
         onChange: (newVal: Dayjs[]) => {
+          const returnValue = getReturnRangeValue(
+            newVal,
+            returnValueFormat.value
+          );
           const formattedValue = getFormattedValue(
             newVal,
-            computedFormat.value
+            parseValueFormat.value
           ) as string[];
           const dateValue = getDateValue(newVal);
-          emit('picker-value-change', formattedValue, dateValue);
-          emit('update:pickerValue', formattedValue);
+          emit('picker-value-change', returnValue, dateValue, formattedValue);
+          emit('update:pickerValue', returnValue);
         },
       })
     );
+
+    function onStartPanelHeaderLabelClick(type: 'year' | 'month') {
+      startHeaderMode.value = type;
+    }
+
+    function onEndPanelHeaderLabelClick(type: 'year' | 'month') {
+      endHeaderMode.value = type;
+    }
+
+    function onStartPanelHeaderSelect(date: Dayjs) {
+      let newStartValue = startHeaderValue.value;
+      newStartValue = newStartValue.set('year', date.year());
+      if (startHeaderMode.value === 'month') {
+        newStartValue = newStartValue.set('month', date.month());
+      }
+      setHeaderValue([newStartValue, endHeaderValue.value]);
+      startHeaderMode.value = undefined;
+    }
+
+    function onEndPanelHeaderSelect(date: Dayjs) {
+      let newEndValue = endHeaderValue.value;
+      newEndValue = newEndValue.set('year', date.year());
+      if (endHeaderMode.value === 'month') {
+        newEndValue = newEndValue.set('month', date.month());
+      }
+      setHeaderValue([startHeaderValue.value, newEndValue]);
+      endHeaderMode.value = undefined;
+    }
 
     const footerValue = ref([
       panelValue.value[0] || getNow(),
@@ -471,6 +644,7 @@ export default defineComponent({
       );
 
     const isDateTime = computed(() => mode.value === 'date' && showTime.value);
+    const hasTime = computed(() => isDateTime.value || timePickerProps.value);
 
     const isDisabledDate = useIsDisabledDate(
       reactive({
@@ -483,16 +657,21 @@ export default defineComponent({
     );
 
     // needConfirm logic
-    const needConfirm = computed(() => isDateTime.value);
+    const needConfirm = computed(
+      () => isDateTime.value || showConfirmBtn.value
+    );
     const confirmBtnDisabled = computed(
       () =>
         needConfirm.value &&
-        (!isCompleteRangeValue(panelValue.value) ||
-          isDisabledDate(panelValue.value[0], 'start') ||
-          isDisabledDate(panelValue.value[1], 'end'))
+        (!isCompleteRangeValue(forSelectedValue.value) ||
+          isDisabledDate(forSelectedValue.value[0], 'start') ||
+          isDisabledDate(forSelectedValue.value[1], 'end'))
     );
 
     watch(panelVisible, (newVisible) => {
+      startHeaderMode.value = undefined;
+      endHeaderMode.value = undefined;
+
       setProcessValue(undefined);
       setPreviewValue(undefined);
       // open
@@ -509,28 +688,45 @@ export default defineComponent({
     });
 
     watch(focusedIndex, () => {
-      focusInput(focusedIndex.value);
-      setInputValue(undefined);
+      if (props.disabledInput) {
+        focusInput(focusedIndex.value);
+        setInputValue(undefined);
+      }
     });
 
     function emitChange(
       value: Array<Dayjs | undefined> | undefined,
       emitOk?: boolean
     ) {
-      const formattedValue = getFormattedValue(value, computedFormat.value);
+      const returnValue = value
+        ? getReturnRangeValue(value, returnValueFormat.value)
+        : undefined;
+      const formattedValue = getFormattedValue(value, parseValueFormat.value);
       const dateValue = getDateValue(value);
       if (isValueChange(value, selectedValue.value)) {
-        emit('change', formattedValue, dateValue);
-        emit('update:modelValue', formattedValue);
+        emit('update:modelValue', returnValue);
+        emit('change', returnValue, dateValue, formattedValue);
+        eventHandlers.value?.onChange?.();
       }
       if (emitOk) {
-        emit('ok', formattedValue, dateValue);
+        emit('ok', returnValue, dateValue, formattedValue);
       }
+    }
+
+    function getSortedDayjsArrayByExchangeTimeOrNot(newValue: Dayjs[]) {
+      let sortedValue = getSortedDayjsArray(newValue);
+      if (hasTime.value && !mergedExchangeTime.value) {
+        sortedValue = [
+          getMergedOpValue(sortedValue[0], newValue[0]),
+          getMergedOpValue(sortedValue[1], newValue[1]),
+        ];
+      }
+      return sortedValue;
     }
 
     function confirm(
       value: Array<Dayjs | undefined> | undefined,
-      showPanel: boolean,
+      showPanel?: boolean,
       emitOk?: boolean
     ) {
       if (
@@ -543,7 +739,7 @@ export default defineComponent({
       let newValue = value ? [...value] : undefined;
 
       if (isCompleteRangeValue(newValue)) {
-        newValue = getSortedDayjsArray(newValue);
+        newValue = getSortedDayjsArrayByExchangeTimeOrNot(newValue);
       }
 
       emitChange(newValue, emitOk);
@@ -551,7 +747,19 @@ export default defineComponent({
       setProcessValue(undefined);
       setPreviewValue(undefined);
       setInputValue(undefined);
-      setPanelVisible(showPanel);
+      startHeaderMode.value = undefined;
+      endHeaderMode.value = undefined;
+
+      if (isBoolean(showPanel)) {
+        setPanelVisible(showPanel);
+      }
+    }
+
+    function emitSelectEvent(value: Array<Dayjs | undefined>) {
+      const returnValue = getReturnRangeValue(value, returnValueFormat.value);
+      const formattedValue = getFormattedValue(value, parseValueFormat.value);
+      const dateValue = getDateValue(value);
+      emit('select', returnValue, dateValue, formattedValue);
     }
 
     function select(
@@ -562,14 +770,20 @@ export default defineComponent({
       }
     ) {
       const { emitSelect = false, updateHeader = false } = options || {};
-      setProcessValue(value);
+
+      let newValue = [...value];
+      if (isCompleteRangeValue(newValue)) {
+        newValue = getSortedDayjsArrayByExchangeTimeOrNot(newValue);
+      }
+
+      setProcessValue(newValue);
       setPreviewValue(undefined);
       setInputValue(undefined);
+      startHeaderMode.value = undefined;
+      endHeaderMode.value = undefined;
 
       if (emitSelect) {
-        const formattedValue = getFormattedValue(value, computedFormat.value);
-        const dateValue = getDateValue(value);
-        emit('select', formattedValue, dateValue);
+        emitSelectEvent(newValue);
       }
 
       if (updateHeader) {
@@ -598,7 +812,7 @@ export default defineComponent({
     }
 
     function getMergedOpValue(date: Dayjs, time?: Dayjs) {
-      if (!isDateTime.value) return date;
+      if (!hasTime.value) return date;
       return mergeValueWithTime(getNow(), date, time);
     }
 
@@ -641,12 +855,15 @@ export default defineComponent({
       );
       newValue[focusedIndex.value] = mergedOpValue;
 
+      emitSelectEvent(newValue);
       if (!needConfirm.value && isCompleteRangeValue(newValue)) {
         confirm(newValue, false);
       } else {
-        select(newValue, { emitSelect: true });
+        select(newValue);
         if (!isCompleteRangeValue(newValue)) {
           focusedIndex.value = nextFocusedIndex.value;
+        } else {
+          focusedIndex.value = 0;
         }
       }
     }
@@ -668,16 +885,23 @@ export default defineComponent({
       }
     }
 
+    let clearShortcutPreviewTimer: any;
+    onUnmounted(() => {
+      clearTimeout(clearShortcutPreviewTimer);
+    });
+
     function onPanelShortcutMouseEnter(value: Array<Dayjs | undefined>) {
+      clearTimeout(clearShortcutPreviewTimer);
       preview(value, { updateHeader: true });
-      resetHeaderValue();
     }
 
     function onPanelShortcutMouseLeave() {
-      setProcessValue(undefined);
-      setPreviewValue(undefined);
-      setInputValue(undefined);
-      resetHeaderValue();
+      clearTimeout(clearShortcutPreviewTimer);
+      clearShortcutPreviewTimer = setTimeout(() => {
+        setPreviewValue(undefined);
+        setInputValue(undefined);
+        resetHeaderValue();
+      }, 100);
     }
 
     function onPanelShortcutClick(
@@ -692,8 +916,9 @@ export default defineComponent({
       confirm(panelValue.value, false, true);
     }
 
-    function onInputClear() {
-      confirm(undefined, true);
+    function onInputClear(e: Event) {
+      e.stopPropagation();
+      confirm(undefined);
       emit('clear');
     }
 
@@ -737,7 +962,6 @@ export default defineComponent({
       newValue[focusedIndex.value] = targetValueDayjs;
 
       select(newValue, { updateHeader: true });
-      resetHeaderValue();
     }
 
     function onInputPressEnter() {
@@ -774,7 +998,7 @@ export default defineComponent({
     });
 
     const rangePanelProps = computed(() => ({
-      ...pick(props as Record<keyof RangePickerProps, any>, [
+      ...pick(props, [
         'mode',
         'showTime',
         'shortcuts',
@@ -783,9 +1007,10 @@ export default defineComponent({
         'disabledDate',
         'disabledTime',
         'hideTrigger',
+        'abbreviation',
       ]),
       prefixCls,
-      format: computedFormat.value,
+      format: parseValueFormat.value,
       value: panelValue.value,
       showConfirmBtn: needConfirm.value,
       confirmBtnDisabled: confirmBtnDisabled.value,
@@ -801,10 +1026,20 @@ export default defineComponent({
       onCellClick: onPanelCellClick,
       onCellMouseEnter: onPanelCellMouseEnter,
       onShortcutClick: onPanelShortcutClick,
-      onShortcutMouseEnter: onPanelShortcutMouseEnter,
-      onShortcutMouseLeave: onPanelShortcutMouseLeave,
+      onShortcutMouseEnter: previewShortcut.value
+        ? onPanelShortcutMouseEnter
+        : undefined,
+      onShortcutMouseLeave: previewShortcut.value
+        ? onPanelShortcutMouseLeave
+        : undefined,
       onConfirm: onPanelConfirm,
       onTimePickerSelect,
+      startHeaderMode: startHeaderMode.value,
+      endHeaderMode: endHeaderMode.value,
+      onStartHeaderLabelClick: onStartPanelHeaderLabelClick,
+      onEndHeaderLabelClick: onEndPanelHeaderLabelClick,
+      onStartHeaderSelect: onStartPanelHeaderSelect,
+      onEndHeaderSelect: onEndPanelHeaderSelect,
     }));
 
     return {
@@ -817,6 +1052,8 @@ export default defineComponent({
       inputValue,
       focusedIndex,
       triggerDisabled,
+      mergedSize,
+      mergedError,
       onPanelVisibleChange,
       onInputClear,
       onInputChange,

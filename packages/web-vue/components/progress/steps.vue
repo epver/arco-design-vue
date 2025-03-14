@@ -1,5 +1,11 @@
 <template>
-  <div :class="`${prefixCls}-wrapper`">
+  <div
+    role="progressbar"
+    aria-valuemin="0"
+    aria-valuemax="100"
+    :aria-valuenow="percent"
+    :class="`${prefixCls}-wrapper`"
+  >
     <div :class="prefixCls" :style="{ height: `${mergedStrokeWidth}px` }">
       <div
         v-for="(active, index) of stepList"
@@ -11,13 +17,13 @@
           },
         ]"
         :style="{
-          backgroundColor: active ? color : '',
+          backgroundColor: active ? color : trackColor,
         }"
       />
     </div>
     <div v-if="showText" :class="`${prefixCls}-text`">
       <slot name="text" :percent="percent">
-        {{ `${percent * 100}%` }}
+        {{ text }}
         <icon-exclamation-circle-fill v-if="status === 'danger'" />
       </slot>
     </div>
@@ -26,6 +32,7 @@
 
 <script lang="ts">
 import { computed, defineComponent, PropType } from 'vue';
+import NP from 'number-precision';
 import { getPrefixCls } from '../_utils/global-config';
 import IconExclamationCircleFill from '../icon/icon-exclamation-circle-fill';
 
@@ -50,6 +57,7 @@ export default defineComponent({
       type: [String, Object],
       default: undefined,
     },
+    trackColor: String,
     strokeWidth: {
       type: Number,
     },
@@ -71,14 +79,17 @@ export default defineComponent({
 
     const stepList = computed(() =>
       [...Array(props.steps)].map((_, index) => {
-        return props.percent > 0 && props.percent >= (1 / props.steps) * index;
+        return props.percent > 0 && props.percent > (1 / props.steps) * index;
       })
     );
+
+    const text = computed(() => `${NP.times(props.percent, 100)}%`);
 
     return {
       prefixCls,
       stepList,
       mergedStrokeWidth,
+      text,
     };
   },
 });

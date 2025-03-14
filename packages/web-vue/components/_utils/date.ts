@@ -5,7 +5,7 @@ import weekOfYear from 'dayjs/plugin/weekOfYear';
 import AdvancedFormat from 'dayjs/plugin/advancedFormat';
 import weekYear from 'dayjs/plugin/weekYear';
 import QuarterOfYear from 'dayjs/plugin/quarterOfYear';
-import { isDayjs, isArray } from './is';
+import { isDayjs, isArray, isQuarter } from './is';
 import 'dayjs/locale/zh-cn';
 
 const overwriteIsDayjs = (_: any, Dayjs: any, dayjs: any) => {
@@ -51,21 +51,34 @@ export const methods = {
   startOf(time: Dayjs, unit: OpUnitType) {
     return time.startOf(unit);
   },
+  /**
+   * Similar to `startOf`, returns start date of a week; used in week pickers
+   * @param time Selected date
+   * @param weekStart Start day of a week
+   * @returns Start date of the week containing the selected date
+   */
+  startOfWeek(time: Dayjs, weekStart: number) {
+    const currentDay = time.day();
+    let startOfWeek = time.subtract(currentDay - weekStart, 'day');
+    if (startOfWeek.isAfter(time)) {
+      startOfWeek = startOfWeek.subtract(7, 'day');
+    }
+    return startOfWeek;
+  },
   endOf(time: Dayjs, unit: OpUnitType) {
     return time.endOf(unit);
   },
   set(time: Dayjs, unit: UnitType, value: number) {
     return time.set(unit, value);
   },
-  isSameWeek(
-    date1: Dayjs,
-    date2: Dayjs,
-    weekStart: number,
-    localeName: string
-  ) {
-    return date1
-      .locale({ ...dayjs.Ls[localeName], weekStart })
-      .isSame(date2, 'week');
+  isSameWeek(date1: Dayjs, date2: Dayjs, weekStart: number) {
+    // calculate week number of the given date considering the given start of week
+    const getWeek = (date: Dayjs) => {
+      const day = date.day();
+      const diff = day - weekStart + (day < weekStart ? 7 : 0);
+      return date.subtract(diff, 'day').week();
+    };
+    return getWeek(date1) === getWeek(date2);
   },
 };
 
@@ -142,11 +155,29 @@ export function getDayjsValue(
   time: DateValue | DateValue[] | (DateValue | undefined)[] | undefined,
   format: string
 ) {
+  const parseQuarterToMonth = (value: string) => {
+    const reg = /(Q1)|(Q2)|(Q3)|(Q4)/;
+    const quarter = {
+      Q1: '01',
+      Q2: '04',
+      Q3: '07',
+      Q4: '10',
+    };
+    const [q] = reg.exec(value) as ('Q1' | 'Q2' | 'Q3' | 'Q4')[];
+    return value.replace(reg, quarter[q]);
+  };
+
   const formatValue = (value: Date | string | number | undefined) => {
     if (!value) return undefined;
 
     if (typeof value === 'string') {
-      return dayjs(value, format);
+      if (isQuarter(format)) {
+        return dayjs(parseQuarterToMonth(value), format.replace(/\[Q]Q/, 'MM'));
+      }
+
+      if (dayjs(value, format).isValid()) {
+        return dayjs(value, format);
+      }
     }
 
     return dayjs(value);
@@ -155,7 +186,6 @@ export function getDayjsValue(
   if (isArray(time)) {
     return time.map(formatValue);
   }
-
   return formatValue(time);
 }
 
@@ -184,4 +214,28 @@ export function getDateValue(
   }
 
   return formatValue(value);
+}
+
+export function initializeDateLocale(localeName: string, weekStart: number) {
+  dayjs.locale({ ...dayjs.Ls[localeName.toLocaleLowerCase()], weekStart });
+}
+
+export function pickDataAttributes<
+  T extends Record<string, any>,
+  K extends keyof T
+>(obj: T): { [key in K]: any } {
+  const clone = {} as { [key in K]: any };
+
+  obj &&
+    Object.keys(obj).forEach((key) => {
+      const k = String(key);
+      if (k.indexOf('data-') === 0) {
+        clone[k] = obj[k];
+      }
+      if (k.indexOf('aria-') === 0) {
+        clone[k] = obj[k];
+      }
+    });
+
+  return clone;
 }

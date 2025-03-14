@@ -7,7 +7,8 @@
   pinkpurple, magenta, gray;
 
 .@{tag-prefix-cls} {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
   box-sizing: border-box;
   height: @tag-size-default;
   padding: @tag-padding-vertical @tag-padding-horizontal;
@@ -43,6 +44,11 @@
     border-color: @tag-default-color-border_hover;
   }
 
+  &-bordered,
+  &-checkable&-checked&-bordered:hover {
+    border-color: @tag-default-bordered-color-border;
+  }
+
   // Size
   &-size-small {
     height: @tag-size-small;
@@ -76,8 +82,14 @@
     color: @tag-default-color-icon;
   }
 
+  &-text {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
   each(@colors, {
-    &-checked&-@{value} {
+    &&-checked&-@{value} {
       color: ~'@{tag-@{value}-color-text}';
       background-color: ~'@{tag-@{value}-color-bg}';
       border: @tag-border-width @tag-border-type ~'@{tag-@{value}-color-border}';
@@ -85,19 +97,24 @@
       .icon-hover-bg(@tag-prefix-cls, ~'@{tag-@{value}-color-icon-bg_hover}');
     }
 
-    &-checkable&-checked&-@{value}&:hover {
+    &&-checkable&-checked&-@{value}&:hover {
       background-color: ~'@{tag-@{value}-color-bg_hover}';
       border-color: ~'@{tag-@{value}-color-border_hover}';
     }
 
-    &-checked&-@{value} &-icon,
-    &-checked&-@{value} &-close-btn,
-    &-checked&-@{value} &-loading-icon {
+    &-checked&-@{value}&-bordered,
+    &-checked&-@{value}&-bordered:hover {
+      border-color: ~'@{tag-@{value}-bordered-color-border}';
+    }
+
+    &&-checked&-@{value} &-icon,
+    &&-checked&-@{value} &-close-btn,
+    &&-checked&-@{value} &-loading-icon {
       color: ~'@{tag-@{value}-color-icon}';
     }
   });
 
-  &-custom-color {
+  &&-custom-color {
     color: @tag-custom-color-text;
 
     .icon-hover-bg(@tag-prefix-cls, @tag-custom-color-icon-bg_hover);
@@ -112,7 +129,7 @@
     }
   }
 
-  &-loading-icon {
+  & &-loading-icon {
     margin-left: 4px;
     font-size: 12px;
   }
@@ -125,13 +142,30 @@
 
   each(@colors, {
     .@{tag-prefix-cls}-checked.@{tag-prefix-cls}-@{value} {
-      background-color: ~'rgba(var(--@{value}-6), 0.2)';
+      background-color: ~'rgba(var(@{arco-cssvars-prefix}-@{value}-6), 0.2)';
 
-      .icon-hover-bg(@tag-prefix-cls, ~'rgba(var(--@{value}-6), 0.35)');
+      .icon-hover-bg(@tag-prefix-cls, ~'rgba(var(@{arco-cssvars-prefix}-@{value}-6), 0.35)');
     }
 
     .@{tag-prefix-cls}-checkable.@{tag-prefix-cls}-checked.@{tag-prefix-cls}-@{value}:hover {
-      background-color: ~'rgba(var(--@{value}-6), 0.35)';
+      background-color: ~'rgba(var(@{arco-cssvars-prefix}-@{value}-6), 0.35)';
     }
   });
+}
+
+.@{tag-prefix-cls}-rtl {
+  direction: rtl;
+
+  .@{tag-prefix-cls} {
+    &-icon {
+      margin-right: 0;
+      margin-left: @tag-icon-margin-right;
+    }
+
+    &-close-btn,
+    &-loading-icon {
+      margin-right: 4px;
+      margin-left: 0;
+    }
+  }
 }

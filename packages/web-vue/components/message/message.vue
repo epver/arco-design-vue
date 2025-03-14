@@ -1,17 +1,24 @@
 <template>
   <li
+    role="alert"
     :class="[
       prefixCls,
       `${prefixCls}-${type}`,
       { [`${prefixCls}-closable`]: closable },
     ]"
+    @mouseenter="handleMouseEnter"
+    @mouseleave="handleMouseLeave"
   >
-    <span v-if="showIcon" :class="`${prefixCls}-icon`">
+    <span
+      v-if="showIcon && !(type === 'normal' && !$slots.icon)"
+      :class="`${prefixCls}-icon`"
+    >
       <slot name="icon">
         <icon-info-circle-fill v-if="type === 'info'" />
         <icon-check-circle-fill v-else-if="type === 'success'" />
         <icon-exclamation-circle-fill v-else-if="type === 'warning'" />
         <icon-close-circle-fill v-else-if="type === 'error'" />
+        <icon-loading v-else-if="type === 'loading'" />
       </slot>
     </span>
     <span :class="`${prefixCls}-content`">
@@ -40,6 +47,7 @@ import IconInfoCircleFill from '../icon/icon-info-circle-fill';
 import IconCheckCircleFill from '../icon/icon-check-circle-fill';
 import IconExclamationCircleFill from '../icon/icon-exclamation-circle-fill';
 import IconCloseCircleFill from '../icon/icon-close-circle-fill';
+import IconLoading from '../icon/icon-loading';
 
 export default defineComponent({
   name: 'Message',
@@ -50,14 +58,12 @@ export default defineComponent({
     IconExclamationCircleFill,
     IconCloseCircleFill,
     IconClose,
+    IconLoading,
   },
   props: {
     type: {
-      type: String as PropType<MessageType>,
+      type: String as PropType<MessageType | 'loading' | 'normal'>,
       default: 'info',
-      validator: (value: any) => {
-        return MESSAGE_TYPES.includes(value);
-      },
     },
     closable: {
       type: Boolean,
@@ -75,6 +81,10 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    resetOnHover: {
+      type: Boolean,
+      default: false,
+    },
   },
   emits: ['close'],
   setup(props, { emit }) {
@@ -85,31 +95,48 @@ export default defineComponent({
       emit('close');
     };
 
-    onMounted(() => {
+    const startTimer = () => {
       if (props.duration > 0) {
         timer = window.setTimeout(handleClose, props.duration);
       }
+    };
+
+    const clearTimer = () => {
+      if (timer) {
+        window.clearTimeout(timer);
+        timer = 0;
+      }
+    };
+
+    onMounted(() => {
+      startTimer();
     });
 
     onUpdated(() => {
       if (props.resetOnUpdate) {
-        if (timer) {
-          window.clearTimeout(timer);
-          timer = 0;
-        }
-        if (props.duration > 0) {
-          timer = window.setTimeout(handleClose, props.duration);
-        }
+        clearTimer();
+        startTimer();
       }
     });
 
     onUnmounted(() => {
-      if (timer) {
-        window.clearTimeout(timer);
-      }
+      clearTimer();
     });
 
+    const handleMouseEnter = () => {
+      if (props.resetOnHover) {
+        clearTimer();
+      }
+    };
+
+    const handleMouseLeave = () => {
+      if (props.resetOnHover) {
+        startTimer();
+      }
+    };
     return {
+      handleMouseEnter,
+      handleMouseLeave,
       prefixCls,
       handleClose,
     };

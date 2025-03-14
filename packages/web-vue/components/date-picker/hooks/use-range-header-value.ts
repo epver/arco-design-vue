@@ -1,5 +1,5 @@
 import { Dayjs } from 'dayjs';
-import { computed, nextTick, reactive, toRefs } from 'vue';
+import { computed, nextTick, reactive, toRefs, watch } from 'vue';
 import pick from '../../_utils/pick';
 import { getSortedDayjsArray, methods } from '../../_utils/date';
 import { CalendarValue, Mode } from '../interface';
@@ -8,6 +8,8 @@ import useHeaderValue from './use-header-value';
 
 interface RangeHeaderValueProps {
   mode: Mode;
+  startHeaderMode?: Mode;
+  endHeaderMode?: Mode;
   value: CalendarValue[] | undefined;
   defaultValue: CalendarValue[] | undefined;
   selectedValue: (Dayjs | undefined)[];
@@ -16,12 +18,20 @@ interface RangeHeaderValueProps {
 }
 
 export default function useRangeHeaderValue(props: RangeHeaderValueProps) {
-  const { mode, value, defaultValue, selectedValue, format, onChange } =
-    toRefs(props);
+  const {
+    startHeaderMode,
+    endHeaderMode,
+    mode,
+    value,
+    defaultValue,
+    selectedValue,
+    format,
+    onChange,
+  } = toRefs(props);
 
-  const unit = computed(() =>
-    ['date', 'week'].includes(mode.value) ? 'M' : 'y'
-  );
+  const isDateOrWeek = computed(() => ['date', 'week'].includes(mode.value));
+
+  const unit = computed(() => (isDateOrWeek.value ? 'M' : 'y'));
 
   const isSame = (current: Dayjs, target: Dayjs) =>
     current.isSame(target, unit.value);
@@ -32,6 +42,9 @@ export default function useRangeHeaderValue(props: RangeHeaderValueProps) {
     })
   );
 
+  const startMode = computed(() => startHeaderMode?.value || mode.value);
+  const endMode = computed(() => endHeaderMode?.value || mode.value);
+
   const startValue = computed(() => value.value?.[0]);
   const endValue = computed(() => value.value?.[1]);
 
@@ -41,16 +54,14 @@ export default function useRangeHeaderValue(props: RangeHeaderValueProps) {
   const emitChange = (newVal: Dayjs[]) => {
     onChange?.value && onChange.value(newVal);
   };
-
-  const [
-    startHeaderValue,
-    setStartHeaderValue,
-    startHeaderOperations,
-    ,
-    getDefaultStartHeaderValue,
-  ] = useHeaderValue(
+  const {
+    headerValue: startHeaderValue,
+    setHeaderValue: setStartHeaderValue,
+    headerOperations: startHeaderOperations,
+    getDefaultLocalValue: getDefaultStartHeaderValue,
+  } = useHeaderValue(
     reactive({
-      mode,
+      mode: startMode,
       value: startValue,
       defaultValue: startDefaultValue,
       selectedValue: undefined,
@@ -61,15 +72,14 @@ export default function useRangeHeaderValue(props: RangeHeaderValueProps) {
     })
   );
 
-  const [
-    endHeaderValue,
-    setEndHeaderValue,
-    endHeaderOperations,
-    ,
-    getDefaultEndHeaderValue,
-  ] = useHeaderValue(
+  const {
+    headerValue: endHeaderValue,
+    setHeaderValue: setEndHeaderValue,
+    headerOperations: endHeaderOperations,
+    getDefaultLocalValue: getDefaultEndHeaderValue,
+  } = useHeaderValue(
     reactive({
-      mode,
+      mode: endMode,
       value: endValue,
       defaultValue: endDefaultValue,
       selectedValue: undefined,
@@ -156,15 +166,17 @@ export default function useRangeHeaderValue(props: RangeHeaderValueProps) {
   );
 
   const computedStartHeaderOperations = computed(() => {
-    const operations = ['onSuperPrev', 'onPrev'];
-    if (canShortenMonth.value) operations.push('onNext');
+    const operations = ['onSuperPrev'];
+    if (isDateOrWeek.value) operations.push('onPrev');
+    if (canShortenMonth.value && isDateOrWeek) operations.push('onNext');
     if (canShortenYear.value) operations.push('onSuperNext');
     return pick(startHeaderOperations.value as any, operations);
   });
 
   const computedEndHeaderOperations = computed(() => {
-    const operations = ['onSuperNext', 'onNext'];
-    if (canShortenMonth.value) operations.push('onPrev');
+    const operations = ['onSuperNext'];
+    if (isDateOrWeek.value) operations.push('onNext');
+    if (canShortenMonth.value && isDateOrWeek.value) operations.push('onPrev');
     if (canShortenYear.value) operations.push('onSuperPrev');
     return pick(endHeaderOperations.value as any, operations);
   });

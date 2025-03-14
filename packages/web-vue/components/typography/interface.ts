@@ -31,7 +31,15 @@ export interface EllipsisConfig {
   showTooltip?:
     | boolean
     | { type: 'tooltip' | 'popover'; props: Record<string, any> };
+  /**
+   * @zh 是否使用 CSS 省略（此模式暂不支持展开、自定义省略号和后缀）
+   * @en Whether to use CSS ellipsis (expansion, custom ellipsis and suffix are not supported in this mode)
+   * @defaultValue false
+   * @version 2.37.0
+   * */
+  css?: boolean;
 }
+
 export interface EllipsisInternalConfig extends Required<EllipsisConfig> {
   showTooltip: boolean;
   TooltipComponent: any;
@@ -44,20 +52,21 @@ export interface EllipsisProps {
 
 export interface CopyProps {
   copyable: boolean;
-  copyText?: string;
+  copyDelay: number;
+  copyText: string | undefined;
 }
 
 export interface EditProps {
   editable: boolean;
   editing: boolean | undefined;
   defaultEditing: boolean;
-  editText?: string;
+  editText: string | undefined;
 }
 
 export type OperationsProps = CopyProps & EditProps & EllipsisProps;
 
 export interface BaseProps extends OperationsProps {
-  type?: 'primary' | 'secondary' | 'success' | 'danger' | 'warning';
+  type: 'primary' | 'secondary' | 'success' | 'danger' | 'warning' | undefined;
   bold: boolean;
   mark: boolean | { color: string };
   underline: boolean;

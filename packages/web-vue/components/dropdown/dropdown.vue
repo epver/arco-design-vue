@@ -1,38 +1,42 @@
 <template>
-  <a-trigger
+  <Trigger
     :popup-visible="computedPopupVisible"
+    animation-name="slide-dynamic-origin"
+    auto-fit-transform-origin
     :trigger="trigger"
     :position="position"
     :popup-offset="4"
     :popup-container="popupContainer"
+    :opened-class="`${prefixCls}-open`"
     @popup-visible-change="handlePopupVisibleChange"
   >
     <slot />
     <template #content>
-      <div :class="`${prefixCls}`">
-        <ul :class="`${prefixCls}-list`">
-          <slot name="content" />
-        </ul>
-      </div>
+      <DropdownPanel>
+        <slot name="content" />
+        <template v-if="$slots.footer" #footer>
+          <slot name="footer" />
+        </template>
+      </DropdownPanel>
     </template>
-  </a-trigger>
+  </Trigger>
 </template>
 
 <script lang="ts">
-import type { PropType } from 'vue';
-import { computed, defineComponent, provide, reactive, ref } from 'vue';
-import { getPrefixCls } from '../_utils/global-config';
+import { defineComponent, PropType, provide, reactive, toRefs } from 'vue';
 import { TriggerEvent } from '../_utils/constant';
-import ATrigger from '../trigger';
-import { dropdownKey } from './context';
-
-const DROPDOWN_POSITIONS = ['top', 'tl', 'tr', 'bottom', 'bl', 'br'] as const;
-type DropdownPosition = typeof DROPDOWN_POSITIONS[number];
+import { getPrefixCls } from '../_utils/global-config';
+import Trigger from '../trigger';
+import DropdownPanel from './dropdown-panel.vue';
+import { useTrigger } from '../_hooks/use-trigger';
+import { dropdownInjectionKey } from './context';
+import { DropdownPosition } from './interface';
 
 export default defineComponent({
   name: 'Dropdown',
   components: {
-    ATrigger,
+    Trigger,
+    DropdownPanel,
   },
   props: {
     /**
@@ -58,7 +62,7 @@ export default defineComponent({
      * @values 'hover','click','focus','contextMenu'
      */
     trigger: {
-      type: String as PropType<TriggerEvent>,
+      type: [String, Array] as PropType<TriggerEvent | TriggerEvent[]>,
       default: 'click',
     },
     /**
@@ -70,62 +74,91 @@ export default defineComponent({
       type: String as PropType<DropdownPosition>,
       default: 'bottom',
     },
-
     /**
      * @zh 弹出框的挂载容器
      * @en Mount container for popup
      */
     popupContainer: {
-      type: [String, Object] as PropType<
-        string | HTMLElement | null | undefined
-      >,
+      type: [String, Object] as PropType<string | HTMLElement>,
+    },
+    /**
+     * @zh 弹出框最大高度
+     * @en Maximum height of the popup
+     * @version 2.29.0
+     */
+    popupMaxHeight: {
+      type: [Boolean, Number],
+      default: true,
+    },
+    /**
+     * @zh 是否在用户选择后隐藏弹出框
+     * @en Whether to hide popup when the user selects
+     * @version 2.43.0
+     */
+    hideOnSelect: {
+      type: Boolean,
+      default: true,
     },
   },
-  emits: [
+  emits: {
+    'update:popupVisible': (visible: boolean) => true,
     /**
      * @zh 下拉框显示状态发生改变时触发
      * @en Triggered when the display status of the drop-down box changes
+     * @param {boolean} visible
      */
-    'popupVisibleChange',
+    'popupVisibleChange': (visible: boolean) => true,
     /**
      * @zh 用户选择时触发
      * @en Triggered when the user selects
+     * @param {string | number | Record<string, any> | undefined } value
+     * @param {Event} ev
      */
-    'select',
-  ],
+    'select': (
+      value: string | number | Record<string, any> | undefined,
+      ev: Event
+    ) => true,
+  },
   /**
    * @zh 内容
    * @en Content
    * @slot content
    */
+  /**
+   * @zh 页脚
+   * @en Footer
+   * @slot footer
+   * @version 2.10.0
+   */
   setup(props, { emit }) {
+    const { defaultPopupVisible, popupVisible, popupMaxHeight } = toRefs(props);
     const prefixCls = getPrefixCls('dropdown');
-    const _popupVisible = ref(props.defaultPopupVisible);
-    const computedPopupVisible = computed(
-      () => props.popupVisible ?? _popupVisible.value
-    );
 
-    const handleClickOption = (value: string | number) => {
-      emit('select', value);
-      handlePopupVisibleChange(false);
-    };
+    const { computedPopupVisible, handlePopupVisibleChange } = useTrigger({
+      defaultPopupVisible,
+      popupVisible,
+      emit,
+    });
 
-    const handlePopupVisibleChange = (popupVisible: boolean) => {
-      _popupVisible.value = popupVisible;
-      emit('popupVisibleChange', popupVisible);
+    const handleOptionClick = (
+      value: string | number | Record<string, any> | undefined,
+      ev: Event
+    ) => {
+      emit('select', value, ev);
+      props.hideOnSelect && handlePopupVisibleChange(false);
     };
 
     provide(
-      dropdownKey,
+      dropdownInjectionKey,
       reactive({
-        onClickOption: handleClickOption,
+        popupMaxHeight,
+        onOptionClick: handleOptionClick,
       })
     );
 
     return {
       prefixCls,
       computedPopupVisible,
-      handleClickOption,
       handlePopupVisibleChange,
     };
   },

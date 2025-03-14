@@ -1,44 +1,58 @@
 import { toRefs, ref, watchEffect, computed } from 'vue';
-import { getCheckedStateByInitKeys, Key2TreeNode } from '../utils';
+import { TreeNodeKey, Key2TreeNode } from '../interface';
+import { getCheckedStateByInitKeys } from '../utils/check-utils';
 
 export default function useCheckedState(props: {
-  defaultCheckedKeys: string[] | undefined;
-  checkedKeys: string[] | undefined;
+  defaultCheckedKeys: TreeNodeKey[] | undefined;
+  checkedKeys: TreeNodeKey[] | undefined;
+  halfCheckedKeys: TreeNodeKey[] | undefined;
   key2TreeNode: Key2TreeNode;
   checkStrictly: boolean;
+  onlyCheckLeaf: boolean;
 }) {
   const {
     defaultCheckedKeys,
     checkedKeys: propCheckedKeys,
     key2TreeNode,
     checkStrictly,
+    halfCheckedKeys,
+    onlyCheckLeaf,
   } = toRefs(props);
 
-  const getStateByInitKeys = (initKeys: string[]) => {
+  const isInitialized = ref(false);
+  const localCheckedKeys = ref<TreeNodeKey[]>([]);
+  const localIndeterminateKeys = ref<TreeNodeKey[]>([]);
+  const computedCheckedKeys = ref<TreeNodeKey[]>();
+  const computedIndeterminateKeys = ref<TreeNodeKey[]>();
+
+  const getStateByKeys = (keys: TreeNodeKey[]) => {
     return getCheckedStateByInitKeys({
-      initCheckedKeys: initKeys,
+      initCheckedKeys: keys,
       key2TreeNode: key2TreeNode.value,
       checkStrictly: checkStrictly.value,
+      onlyCheckLeaf: onlyCheckLeaf.value,
     });
   };
 
-  const initLocalState = getStateByInitKeys(
-    propCheckedKeys.value || defaultCheckedKeys?.value || []
-  );
-  const localCheckedKeys = ref(initLocalState[0]);
-  const localIndeterminateKeys = ref(initLocalState[1]);
+  const init = (keys: TreeNodeKey[]) => {
+    const initState = getStateByKeys(keys);
+    [localCheckedKeys.value, localIndeterminateKeys.value] = initState;
+  };
 
-  const computedCheckedKeys = ref<string[]>();
-  const computedIndeterminateKeys = ref<string[]>();
+  init(propCheckedKeys.value || defaultCheckedKeys?.value || []);
+
   watchEffect(() => {
     if (propCheckedKeys.value) {
       [computedCheckedKeys.value, computedIndeterminateKeys.value] =
-        getStateByInitKeys(propCheckedKeys.value);
-    } else {
+        getStateByKeys(propCheckedKeys.value);
+    } else if (isInitialized.value) {
       computedCheckedKeys.value = undefined;
       computedIndeterminateKeys.value = undefined;
       localCheckedKeys.value = [];
       localIndeterminateKeys.value = [];
+    }
+    if (!isInitialized.value) {
+      isInitialized.value = true;
     }
   });
 
@@ -46,12 +60,24 @@ export default function useCheckedState(props: {
     checkedKeys: computed(
       () => computedCheckedKeys.value || localCheckedKeys.value
     ),
-    indeterminateKeys: computed(
-      () => computedIndeterminateKeys.value || localIndeterminateKeys.value
-    ),
-    setCheckedState(newCheckedKeys: string[], newIndeterminateKeys: string[]) {
-      localCheckedKeys.value = newCheckedKeys;
-      localIndeterminateKeys.value = newIndeterminateKeys;
+    indeterminateKeys: computed(() => {
+      if (checkStrictly.value && halfCheckedKeys.value) {
+        return halfCheckedKeys.value;
+      }
+      return computedIndeterminateKeys.value || localIndeterminateKeys.value;
+    }),
+    setCheckedState(
+      newCheckedKeys: TreeNodeKey[],
+      newIndeterminateKeys: TreeNodeKey[],
+      reinitialize = false
+    ) {
+      if (reinitialize) {
+        init(newCheckedKeys);
+      } else {
+        localCheckedKeys.value = newCheckedKeys;
+        localIndeterminateKeys.value = newIndeterminateKeys;
+      }
+      return [localCheckedKeys.value, localIndeterminateKeys.value];
     },
   };
 }

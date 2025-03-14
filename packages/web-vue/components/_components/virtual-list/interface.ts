@@ -1,9 +1,9 @@
 import { VNode } from 'vue';
 
-export type Key = string | number;
+export type VirtualItemKey = string | number;
 
 export interface InternalDataItem {
-  key: string;
+  key: VirtualItemKey;
   index: number;
   item: unknown;
 }
@@ -12,7 +12,7 @@ export type ItemSlot = (props: { item: unknown; index: number }) => VNode[];
 
 export interface ScrollIntoViewOptions {
   index?: number;
-  key?: number | string;
+  key?: VirtualItemKey;
   align: 'auto' | 'top' | 'bottom';
 }
 
@@ -31,9 +31,17 @@ export interface VirtualListProps {
    * @zh 元素高度是否是固定的
    * @en Is the element height fixed
    */
-  isStaticItemHeight: boolean;
+  isStaticItemHeight?: boolean;
   estimatedItemHeight?: number;
-  data: unknown[];
-  itemKey: string | ((item: unknown) => string | number);
-  component: keyof HTMLElementTagNameMap;
+  data?: unknown[];
+  itemKey?: string;
+  component?: keyof HTMLElementTagNameMap;
+}
+
+export type ScrollOptions =
+  | number
+  | { index?: number; key?: VirtualItemKey; align?: 'auto' | 'top' | 'bottom' };
+
+export interface VirtualListRef {
+  scrollTo: (options: ScrollOptions) => void;
 }

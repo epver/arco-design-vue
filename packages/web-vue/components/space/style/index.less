@@ -5,6 +5,13 @@
 .@{space-prefix-cls} {
   display: inline-flex;
 
+  &-horizontal {
+    .@{space-prefix-cls}-item {
+      display: flex;
+      align-items: center;
+    }
+  }
+
   &-vertical {
     flex-direction: column;
   }
@@ -27,5 +34,13 @@
 
   &-wrap {
     flex-wrap: wrap;
+  }
+
+  &-fill {
+    display: flex;
+  }
+
+  &-rtl {
+    direction: rtl;
   }
 }

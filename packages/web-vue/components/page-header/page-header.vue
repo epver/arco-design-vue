@@ -9,15 +9,24 @@
           <a-icon-hover
             v-if="showBack"
             :class="`${prefixCls}-back-btn`"
+            :prefix="prefixCls"
             @click="handleBack"
           >
-            <icon-left />
+            <slot name="back-icon">
+              <icon-left />
+            </slot>
           </a-icon-hover>
           <span :class="`${prefixCls}-title`">
             <slot name="title">{{ title }}</slot>
           </span>
-          <span :class="`${prefixCls}-divider`" />
-          <span :class="`${prefixCls}-subtitle`">
+          <span
+            v-if="$slots.subtitle || subtitle"
+            :class="`${prefixCls}-divider`"
+          />
+          <span
+            v-if="$slots.subtitle || subtitle"
+            :class="`${prefixCls}-subtitle`"
+          >
             <slot name="subtitle">{{ subtitle }}</slot>
           </span>
         </span>
@@ -69,6 +78,12 @@ export default defineComponent({
      */
     'back',
   ],
+  /**
+   * @zh 返回按钮
+   * @en Back icon
+   * @slot back-icon
+   * @version 2.36.0
+   */
   /**
    * @zh 主标题
    * @en Main title

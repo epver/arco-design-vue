@@ -30,6 +30,8 @@ description: Clearly indicate the task flow and the current degree of completion
 
 @import ./__demo__/changeable.md
 
+## API
+
 
 ### `<steps>` Props
 
@@ -48,7 +50,7 @@ description: Clearly indicate the task flow and the current degree of completion
 
 |Event Name|Description|Parameters|
 |---|---|---|
-|change|Triggered when the number of steps changes|step: `number`|
+|change|Triggered when the number of steps changes|step: `number`<br>ev: `Event`|
 
 
 
@@ -57,6 +59,7 @@ description: Clearly indicate the task flow and the current degree of completion
 
 |Attribute|Description|Type|Default|
 |---|---|---|:---:|
+|title|Title of the step|`string`|`-`|
 |description|Description of the step|`string`|`-`|
 |status|Status of the step|`'wait' \| 'process' \| 'finish' \| 'error'`|`-`|
 |disabled|Whether to disable|`boolean`|`false`|

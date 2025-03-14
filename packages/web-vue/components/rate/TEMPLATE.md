@@ -21,6 +21,8 @@ description: The component used for scoring or starring.
 
 @import ./__demo__/half.md
 
+@import ./__demo__/color.md
+
 @import ./__demo__/readonly.md
 
 @import ./__demo__/clear.md
@@ -30,5 +32,7 @@ description: The component used for scoring or starring.
 @import ./__demo__/count.md
 
 @import ./__demo__/grading.md
+
+## API
 
 %%API(rate.tsx)%%

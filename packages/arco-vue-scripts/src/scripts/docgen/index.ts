@@ -1,3 +1,4 @@
+/* eslint-disable no-await-in-loop */
 import path from 'path';
 import fs from 'fs-extra';
 import glob from 'glob';
@@ -14,6 +15,7 @@ const MD_TEMPLATE = 'TEMPLATE.md';
 const MD_TARGET = 'README.zh-CN.md';
 const MD_TARGET_EN = 'README.en-US.md';
 const MD_MATERIAL_README = 'docs/README.md';
+const MD_MATERIAL_README_EN = 'docs/README.en-US.md';
 const TEMPLATE_GLOB = `components/*/${MD_TEMPLATE}`;
 
 type ComponentDocType = ComponentDoc | ComponentDoc[];
@@ -44,7 +46,17 @@ const getApiTmpl = (
         title = `\`${title}\` ${suffix}`;
       }
 
-      return `### ${title}\n${content}`;
+      if (tags?.version) {
+        const version = (tags.version[0] as any)?.description;
+        version && (title += ` (${version})`);
+      }
+
+      let description = '';
+      if (suffix === 'Props' && tags?.[lang]) {
+        description = (tags[lang][0] as any)?.description;
+      }
+
+      return `### ${title}${description ? `\n${description}` : ''}\n${content}`;
     };
 
     const propsTmpl = getTmpl(
@@ -96,6 +108,7 @@ const replacePlaceholderToDoc = async ({
       });
       result = result.replace(item[0], getApiTmpl(componentDoc, type, lang));
     } catch (err) {
+      // eslint-disable-next-line no-console
       console.log(err, dir);
     }
   }
@@ -138,7 +151,7 @@ const docgen = async ({
 
   for (const filename of files) {
     const dirname = path.dirname(filename);
-    let result = fs.readFileSync(filename, 'utf8');
+    const result = fs.readFileSync(filename, 'utf8');
     let zhResult = getTemplate(result, 'zh');
     let enResult = getTemplate(result, 'en');
     // API占位符替换
@@ -184,7 +197,12 @@ const docgen = async ({
       (match) => `${match}\n*Auto translate by google.*\n`
     );
 
-    result = await parseMaterial(result, {
+    zhResult = await parseMaterial(zhResult, {
+      matcher: /%%MATERIAL\((.+?)\)%%/,
+      dirname,
+    });
+
+    enResult = await parseMaterial(enResult, {
       matcher: /%%MATERIAL\((.+?)\)%%/,
       dirname,
     });
@@ -196,7 +214,9 @@ const docgen = async ({
 
       await fs.outputFile(outputPath, zhResult);
 
-      const outputPath2 = path.resolve(dirname, MD_TARGET_EN);
+      const outputPath2 = input
+        ? path.resolve(process.cwd(), MD_MATERIAL_README_EN)
+        : path.resolve(dirname, MD_TARGET_EN);
 
       await fs.outputFile(outputPath2, enResult);
 

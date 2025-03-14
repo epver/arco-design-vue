@@ -9,6 +9,8 @@
   @collapse-expand-icon-size-bg
 );
 
+.icon-hover-bg(~'@{collapse-prefix-cls}-item', @collapse-expand-icon-color-bg);
+
 .@{collapse-prefix-cls} {
   overflow: hidden;
   line-height: @collapse-line-height;
@@ -18,7 +20,7 @@
   &-item {
     box-sizing: border-box;
     border-bottom: @collapse-title-border-width solid
-      @collapse-title-color-border;
+      @collapse-item-color-border;
 
     &-active {
       > .@{collapse-prefix-cls}-item-header {
@@ -34,7 +36,8 @@
           transform: rotate(90deg);
         }
 
-        .@{collapse-prefix-cls}-item-icon-right .@{collapse-prefix-cls}-item-expand-icon {
+        .@{collapse-prefix-cls}-item-icon-right
+          .@{collapse-prefix-cls}-item-expand-icon {
           transform: rotate(-90deg);
         }
       }
@@ -46,11 +49,12 @@
       align-items: center;
       justify-content: space-between;
       box-sizing: border-box;
-      min-height: @collapse-title-min-height;
       padding-top: @collapse-title-padding-vertical;
       padding-bottom: $padding-top;
       overflow: hidden;
       color: @collapse-title-color-text;
+      font-size: @collapse-title-font-size;
+      line-height: @collapse-title-line-height;
       background-color: @collapse-title-color-bg;
       border-bottom: 1px solid @color-transparent;
       cursor: pointer;
@@ -67,6 +71,10 @@
         padding-right: @collapse-title-padding-horizontal +
           @collapse-expand-icon-size-bg + @collapse-expand-icon-spacing-text;
         padding-left: @collapse-title-padding-horizontal;
+
+        + .@{collapse-prefix-cls}-item-content {
+          padding-left: @collapse-title-padding-horizontal;
+        }
       }
 
       &-disabled {
@@ -95,8 +103,6 @@
       left: @collapse-title-padding-horizontal;
       text-align: center;
       transform: translateY(-50%);
-
-
     }
 
     & &-icon-right {
@@ -120,7 +126,6 @@
 
     &-content {
       position: relative;
-      display: none;
       padding-right: @collapse-title-padding-horizontal;
       padding-left: @collapse-title-padding-horizontal +
         @collapse-expand-icon-size-bg + @collapse-expand-icon-spacing-text;
@@ -137,6 +142,10 @@
       &-box {
         padding: @collapse-content-padding-vertical 0;
       }
+    }
+
+    &&-disabled > &-content {
+      color: @collapse-content-color-text_disabled;
     }
 
     &-no-icon > &-header {

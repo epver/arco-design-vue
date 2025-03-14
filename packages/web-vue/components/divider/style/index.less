@@ -11,13 +11,17 @@
     max-width: 100%;
     margin: @divider-margin-vertical 0;
     border-bottom: @divider-size @divider-line-style @divider-color-bg;
+
+    &.@{divider-prefix-cls}-with-text {
+      margin: @divider-margin-vertical_text 0;
+    }
   }
 
   &-vertical {
     display: inline-block;
     min-width: 1px;
     max-width: 1px;
-    height: 1em;
+    min-height: 1em;
     margin: 0 @divider-margin-horizontal;
     vertical-align: middle;
     border-left: @divider-size @divider-line-style @divider-color-bg;
@@ -33,7 +37,7 @@
     font-weight: @divider-font-weight;
     font-size: @divider-font-size;
     line-height: 2;
-    background: var(--color-bg-2);
+    background: var(~'@{arco-cssvars-prefix}-color-bg-2');
     transform: translateY(-50%);
 
     &-center {

@@ -1,10 +1,11 @@
-import { computed, defineComponent, ref } from 'vue';
+import { computed, defineComponent, PropType, ref } from 'vue';
 import { getFiles, loopDirectory } from './utils';
 import { useI18n } from '../locale';
 import { getPrefixCls } from '../_utils/global-config';
 import IconPlus from '../icon/icon-plus';
 import Button from '../button';
 import IconUpload from '../icon/icon-upload';
+import { isFunction, isPromise } from '../_utils/is';
 
 export default defineComponent({
   name: 'UploadButton',
@@ -34,9 +35,9 @@ export default defineComponent({
       type: Function,
       required: true,
     },
-    isMax: {
-      type: Boolean,
-      default: false,
+    hide: Boolean,
+    onButtonClick: {
+      type: Function as PropType<(event: Event) => Promise<FileList> | void>,
     },
   },
   setup(props, { slots }) {
@@ -45,9 +46,30 @@ export default defineComponent({
     const isDragging = ref(false);
     const inputRef = ref<HTMLInputElement | null>(null);
     const dropRef = ref<HTMLElement | null>(null);
+    const dragEnterCount = ref<number>(0); // the number of times ondragenter was triggered
 
-    const handleClick = () => {
-      if (!props.disabled && inputRef.value) {
+    const setDragEnterCount = (type: 'subtract' | 'add' | 'reset') => {
+      if (type === 'subtract') {
+        dragEnterCount.value -= 1;
+      } else if (type === 'add') {
+        dragEnterCount.value += 1;
+      } else if (type === 'reset') {
+        dragEnterCount.value = 0;
+      }
+    };
+
+    const handleClick = (e: Event) => {
+      if (props.disabled) return;
+      if (isFunction(props.onButtonClick)) {
+        const result = props.onButtonClick(e);
+        if (isPromise<FileList>(result)) {
+          result.then((files) => {
+            props.uploadFiles(getFiles(files));
+          });
+          return;
+        }
+      }
+      if (inputRef.value) {
         inputRef.value.click();
       }
     };
@@ -64,14 +86,14 @@ export default defineComponent({
     const handleDrop = (e: DragEvent) => {
       e.preventDefault();
       isDragging.value = false;
+      setDragEnterCount('reset');
       if (props.disabled) {
         return;
       }
 
-      if (props.directory) {
-        loopDirectory(e.dataTransfer?.items, props.accept, (file) => {
-          // eslint-disable-next-line no-console
-          console.log();
+      if (props.directory && e.dataTransfer?.items) {
+        loopDirectory(e.dataTransfer.items, props.accept, (files) => {
+          props.uploadFiles(files);
         });
       } else {
         const files = getFiles(e.dataTransfer?.files, props.accept);
@@ -81,8 +103,10 @@ export default defineComponent({
 
     const handleDragLeave = (e: DragEvent) => {
       e.preventDefault();
-      if (!dropRef.value || dropRef.value.contains(e.target as HTMLElement)) {
+      setDragEnterCount('subtract');
+      if (dragEnterCount.value === 0) {
         isDragging.value = false;
+        setDragEnterCount('reset');
       }
     };
 
@@ -130,6 +154,7 @@ export default defineComponent({
 
       return (
         <Button
+          type="primary"
           v-slots={{ icon: () => <IconUpload /> }}
           disabled={props.disabled}
         >
@@ -144,7 +169,7 @@ export default defineComponent({
         [`${prefixCls}-type-picture-card`]: props.listType === 'picture-card',
         [`${prefixCls}-draggable`]: props.draggable,
         [`${prefixCls}-disabled`]: props.disabled,
-        [`${prefixCls}-hide`]: props.isMax,
+        [`${prefixCls}-hide`]: props.hide,
       },
     ]);
 
@@ -153,6 +178,9 @@ export default defineComponent({
         ref={dropRef}
         class={cls.value}
         onClick={handleClick}
+        onDragenter={() => {
+          setDragEnterCount('add');
+        }}
         onDrop={handleDrop}
         onDragover={handleDragOver}
         onDragleave={handleDragLeave}
@@ -164,6 +192,7 @@ export default defineComponent({
           disabled={props.disabled}
           accept={props.accept}
           multiple={props.multiple}
+          {...(props.directory ? { webkitdirectory: 'webkitdirectory' } : {})}
           onChange={handleInputChange}
         />
         {renderButton()}

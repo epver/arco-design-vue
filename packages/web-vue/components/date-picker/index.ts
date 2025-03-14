@@ -8,6 +8,8 @@ import _YearPicker from './pickers/year-picker';
 import _QuarterPicker from './pickers/quarter-picker';
 import _RangePicker from './range-picker.vue';
 
+export type { ShortcutType } from './interface';
+
 const DatePicker = Object.assign(_DatePicker, {
   WeekPicker: _WeekPicker,
   MonthPicker: _MonthPicker,
@@ -33,5 +35,13 @@ export type MonthPickerInstance = InstanceType<typeof _MonthPicker>;
 export type YearPickerInstance = InstanceType<typeof _YearPicker>;
 export type QuarterPickerInstance = InstanceType<typeof _QuarterPicker>;
 export type RangePickerInstance = InstanceType<typeof _RangePicker>;
+
+export {
+  _WeekPicker as WeekPicker,
+  _MonthPicker as MonthPicker,
+  _YearPicker as YearPicker,
+  _QuarterPicker as QuarterPicker,
+  _RangePicker as RangePicker,
+};
 
 export default DatePicker;

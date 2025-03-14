@@ -30,4 +30,13 @@ export type LayoutContentInstance = InstanceType<typeof _LayoutContent>;
 export type LayoutFooterInstance = InstanceType<typeof _LayoutFooter>;
 export type LayoutSiderInstance = InstanceType<typeof _LayoutSider>;
 
+export type { LayoutProps, SiderProps } from './interface';
+
+export {
+  _LayoutHeader as LayoutHeader,
+  _LayoutContent as LayoutContent,
+  _LayoutFooter as LayoutFooter,
+  _LayoutSider as LayoutSider,
+};
+
 export default Layout;

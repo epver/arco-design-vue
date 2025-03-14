@@ -1,5 +1,5 @@
 <template>
-  <ResizeOberver @resize="handleWrapperResize">
+  <ResizeObserver @resize="handleResize">
     <component
       :is="component"
       v-bind="$attrs"
@@ -12,13 +12,16 @@
       @scroll="handleScroll"
     >
       <Filler
-        :height="totalHeight"
+        :height="isVirtual ? totalHeight : viewportHeight"
         :offset="isVirtual ? startOffset : undefined"
+        :type="type"
+        :outer-attrs="outerAttrs"
+        :inner-attrs="innerAttrs"
       >
         <RenderFunction :render-func="renderChildren" />
       </Filler>
     </component>
-  </ResizeOberver>
+  </ResizeObserver>
 </template>
 
 <script lang="tsx">
@@ -34,18 +37,23 @@ import {
   Ref,
   onUnmounted,
 } from 'vue';
-import { ItemSlot, VirtualListProps } from './interface';
-import { isString, isUndefined } from '../../_utils/is';
+import {
+  ItemSlot,
+  ScrollOptions,
+  VirtualListProps,
+  VirtualItemKey,
+} from './interface';
+import { isFunction, isString, isUndefined } from '../../_utils/is';
 import { raf, caf } from '../../_utils/raf';
 import usePickSlots from '../../_hooks/use-pick-slots';
-import ResizeOberver from '../resize-observer';
+import ResizeObserver from '../resize-observer';
 import RenderFunction from '../render-function';
 import Filler from './filler.vue';
 import { useViewportHeight } from './hooks/use-viewport-height';
 import { useItemHeight } from './hooks/use-item-height';
 import { useRenderChildren } from './hooks/use-render-children';
 import { useRangeState } from './hooks/use-range-state';
-import { useScrollTo, ScrollOptions } from './hooks/use-scroll-to';
+import { useScrollTo } from './hooks/use-scroll-to';
 import {
   getScrollPercentage,
   getValidScrollTop,
@@ -55,7 +63,7 @@ import {
 export default defineComponent({
   name: 'VirtualList',
   components: {
-    ResizeOberver,
+    ResizeObserver,
     Filler,
     RenderFunction,
   },
@@ -108,9 +116,12 @@ export default defineComponent({
       type: String as PropType<VirtualListProps['component']>,
       default: 'div',
     },
+    type: String,
+    outerAttrs: Object,
+    innerAttrs: Object,
   },
-  emits: ['scroll'],
-  setup(props: VirtualListProps, { slots, emit }) {
+  emits: ['scroll', 'resize'],
+  setup(props, { slots, emit }) {
     const {
       height,
       itemKey,
@@ -121,16 +132,18 @@ export default defineComponent({
     } = toRefs(props);
 
     function getItemKey(item: any, index: number) {
-      return itemKey && itemKey.value
-        ? isString(itemKey.value)
-          ? item[itemKey.value]
-          : itemKey.value(item)
-        : index;
+      let result: VirtualItemKey | undefined;
+      if (isString(itemKey.value)) {
+        result = item[itemKey.value];
+      } else if (isFunction(itemKey.value)) {
+        result = itemKey.value(item);
+      }
+      return result ?? index;
     }
 
     // Convert data to internal format: {key, index, item}
     const internalData = computed(() =>
-      data.value.map((item, index) => ({
+      (data.value || []).map((item, index) => ({
         key: getItemKey(item, index),
         index,
         item,
@@ -148,7 +161,7 @@ export default defineComponent({
 
     const {
       itemHeight,
-      estimatedItemHeight,
+      minItemHeight,
       totalHeight,
       setItemHeight,
       getItemHeight,
@@ -161,9 +174,9 @@ export default defineComponent({
       })
     );
 
-    const itemCount = computed(() => data.value.length);
+    const itemCount = computed(() => internalData.value.length);
     const visibleCount = computed(() =>
-      Math.ceil(viewportHeight.value / itemHeight.value)
+      Math.ceil(viewportHeight.value / minItemHeight.value)
     );
 
     const scrollTop = ref(0);
@@ -177,12 +190,11 @@ export default defineComponent({
       })
     );
 
-    const visibleData = computed(() =>
-      internalData.value.slice(
-        rangeState.startIndex,
-        Math.min(rangeState.endIndex + 1, itemCount.value)
-      )
-    );
+    const visibleData = computed(() => {
+      const start = rangeState.startIndex;
+      const end = Math.min(rangeState.endIndex + 1, itemCount.value);
+      return internalData.value.slice(start, end);
+    });
 
     const isVirtual = computed(
       () =>
@@ -213,24 +225,24 @@ export default defineComponent({
     const itemRender = usePickSlots(slots, 'item') as Ref<ItemSlot>;
     const renderChildren = useRenderChildren(
       reactive({
+        internalData,
         visibleData,
         itemRender,
-        itemRef: (el: HTMLElement | null, key: string) => {
-          const itemHeight = getItemHeight(key);
-          if (el && isUndefined(itemHeight)) {
-            if (
-              isStaticItemHeight.value &&
-              !isUndefined(estimatedItemHeight.value)
-            ) {
-              setItemHeight(key, estimatedItemHeight.value);
+      }),
+      {
+        onItemResize(el, key) {
+          if (el && isUndefined(getItemHeight(key))) {
+            if (isStaticItemHeight.value) {
+              setItemHeight(key, itemHeight.value);
             } else {
-              nextTick(() => {
-                setItemHeight(key, el.clientHeight);
-              });
+              const height = el.offsetHeight;
+              if (height) {
+                setItemHeight(key, height);
+              }
             }
           }
         },
-      })
+      }
     );
 
     const updateScrollOffset = () => {
@@ -287,7 +299,12 @@ export default defineComponent({
       })
     );
 
-    const handleWrapperResize = (entry: HTMLDivElement) => {
+    const handleResize = (entry: HTMLElement) => {
+      handleWrapperResize(entry);
+      emit('resize', entry);
+    };
+
+    const handleWrapperResize = (entry: HTMLElement) => {
       if (needMeasureViewportHeight.value) {
         setViewportHeight(entry.clientHeight);
       }
@@ -342,28 +359,24 @@ export default defineComponent({
     };
 
     // Element size changes, viewport changes size changes, scroll position changes need to recalculate the start and end elements
-    watch([itemHeight, visibleCount, scrollTop], () => {
+    watch([itemHeight, visibleCount, scrollTop, data], () => {
       if (lockScrollRef.value) return;
       updateRangeState();
     });
 
     // 开始和结束元素变化后需要更新偏移
     watch(rangeState, () => {
-      nextTick(() => {
-        updateScrollOffset();
-      });
+      updateScrollOffset();
     });
 
     return {
       viewportRef,
-      visibleData,
       viewportHeight,
       totalHeight,
       startOffset,
-      itemHeight,
       isVirtual,
       renderChildren,
-      handleWrapperResize,
+      handleResize,
       handleScroll,
       scrollTo,
     };

@@ -1,7 +1,10 @@
 <template>
   <transition name="zoom-in-top" @after-leave="handleAfterLeave">
-    <div v-if="visible" :class="cls">
-      <div v-if="showIcon" :class="`${prefixCls}-icon`">
+    <div v-if="visible" role="alert" :class="cls">
+      <div
+        v-if="showIcon && !(type === 'normal' && !$slots.icon)"
+        :class="`${prefixCls}-icon`"
+      >
         <slot name="icon">
           <icon-info-circle-fill v-if="type === 'info'" />
           <icon-check-circle-fill v-else-if="type === 'success'" />
@@ -19,27 +22,32 @@
           <slot />
         </div>
       </div>
+      <div v-if="$slots.action" :class="`${prefixCls}-action`">
+        <slot name="action" />
+      </div>
       <div
         v-if="closable"
+        tabindex="-1"
+        role="button"
+        aria-label="Close"
         :class="`${prefixCls}-close-btn`"
         @click="handleClose"
       >
-        <icon-hover>
-          <icon-close />
-        </icon-hover>
+        <slot name="close-element">
+          <icon-hover>
+            <icon-close />
+          </icon-hover>
+        </slot>
       </div>
     </div>
   </transition>
 </template>
 
 <script lang="ts">
-/**
- * @todo 增加自定义关闭按钮图标功能
- */
 import type { PropType } from 'vue';
 import { computed, defineComponent, ref } from 'vue';
 import { getPrefixCls } from '../_utils/global-config';
-import { MESSAGE_TYPES, MessageType } from '../_utils/constant';
+import { MessageType } from '../_utils/constant';
 import IconHover from '../_components/icon-hover.vue';
 import IconClose from '../icon/icon-close';
 import IconInfoCircleFill from '../icon/icon-info-circle-fill';
@@ -59,16 +67,13 @@ export default defineComponent({
   },
   props: {
     /**
-     * @zh 警告提示的类型
-     * @en Type of the alert
-     * @values info, success, warning, error
+     * @zh 警告提示的类型。2.41.0 新增 `normal` 类型
+     * @en Type of the alert. 2.41.0 Added `normal` type
+     * @values info, success, warning, error, normal
      */
     type: {
-      type: String as PropType<MessageType>,
+      type: String as PropType<MessageType | 'normal'>,
       default: 'info',
-      validator: (value: any) => {
-        return MESSAGE_TYPES.includes(value);
-      },
     },
     /**
      * @zh 是否展示图标
@@ -99,26 +104,28 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
-    // for JSX
-    onClose: {
-      type: Function as PropType<() => void>,
-    },
-    onAfterClose: {
-      type: Function as PropType<() => void>,
+    /**
+     * @zh 内容是否居中显示
+     * @en Whether the content is displayed in the center
+     */
+    center: {
+      type: Boolean,
+      default: false,
     },
   },
-  emits: [
+  emits: {
     /**
      * @zh 点击关闭按钮时触发
      * @en Triggered when the close button is clicked
+     * @param {MouseEvent} ev
      */
-    'close',
+    close: (ev: MouseEvent) => true,
     /**
      * @zh 关闭动画结束后触发
      * @en Triggered after the close animation ends
      */
-    'afterClose',
-  ],
+    afterClose: () => true,
+  },
   /**
    * @zh 标题
    * @en Title
@@ -129,13 +136,24 @@ export default defineComponent({
    * @en Icon
    * @slot icon
    */
+  /**
+   * @zh 操作项
+   * @en Actions
+   * @slot action
+   */
+  /**
+   * @zh 关闭元素
+   * @en Close element
+   * @slot close-element
+   * @version 2.36.0
+   */
   setup(props, { slots, emit }) {
     const prefixCls = getPrefixCls('alert');
     const visible = ref(true);
 
-    const handleClose = () => {
+    const handleClose = (ev: MouseEvent) => {
       visible.value = false;
-      emit('close');
+      emit('close', ev);
     };
 
     const handleAfterLeave = () => {
@@ -148,6 +166,7 @@ export default defineComponent({
       {
         [`${prefixCls}-with-title`]: Boolean(props.title || slots.title),
         [`${prefixCls}-banner`]: props.banner,
+        [`${prefixCls}-center`]: props.center,
       },
     ]);
 

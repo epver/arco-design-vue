@@ -5,51 +5,78 @@
     trigger="click"
     position="bl"
     :popup-offset="4"
+    animation-name="slide-dynamic-origin"
+    :prevent-focus="true"
     v-bind="triggerProps"
-    :disabled="disabled"
+    :disabled="mergedDisabled"
     :popup-visible="panelVisible"
     :popup-container="popupContainer"
+    :click-to-close="!allowSearch"
+    auto-fit-transform-origin
     @popupVisibleChange="onVisibleChange"
   >
     <slot name="trigger">
       <SelectView
         ref="refSelectView"
-        :model-value="selectedValue"
+        :model-value="selectViewValue"
         :input-value="searchValue"
-        :allow-search="allowSearch"
+        :allow-search="Boolean(allowSearch)"
         :allow-clear="allowClear"
         :loading="loading"
         :size="size"
-        :max-tags="maxTags"
-        :disabled="disabled"
+        :max-tag-count="maxTagCount"
+        :disabled="mergedDisabled"
+        :opened="panelVisible"
         :error="error"
-        :border="border"
+        :bordered="border"
         :placeholder="placeholder"
         :multiple="isMultiple"
         v-bind="$attrs"
         @inputValueChange="onSearchValueChange"
-        @clear="onClear"
+        @clear="onInnerClear"
+        @remove="onItemRemove"
+        @blur="onBlur"
       >
-        <slot v-if="$slots.prefix" name="prefix" />
-        <slot v-if="$slots.tag" name="tag" />
+        <template v-if="$slots.prefix" #prefix>
+          <slot name="prefix" />
+        </template>
+        <template v-if="$slots.label" #label="selectedData">
+          <slot name="label" v-bind="selectedData" />
+        </template>
       </SelectView>
     </slot>
     <template #content>
       <div
-        :class="[`${prefixCls}-popup`, dropdownClassName]"
+        :class="[
+          `${prefixCls}-popup`,
+          {
+            [`${prefixCls}-has-header`]: Boolean($slots.header),
+            [`${prefixCls}-has-footer`]: Boolean($slots.footer),
+          },
+          dropdownClassName,
+        ]"
         :style="computedDropdownStyle"
       >
+        <div
+          v-if="$slots.header && (!isEmpty || showHeaderOnEmpty)"
+          :class="`${prefixCls}-header`"
+        >
+          <slot name="header" />
+        </div>
         <slot v-if="loading" name="loader">
           <Spin />
         </slot>
-        <slot v-else-if="isEmptyTreeData || isEmptyFilterResult" name="empty">
-          <Empty />
+        <slot v-else-if="isEmpty" name="empty">
+          <component :is="TreeSelectEmpty ? TreeSelectEmpty : 'Empty'" />
         </slot>
         <Panel
           v-else
           :selected-keys="selectedKeys"
-          :checkable="treeCheckable"
+          :show-checkable="treeCheckable"
+          :scrollbar="scrollbar"
           :tree-props="{
+            actionOnNodeClick: selectable === 'leaf' ? 'expand' : undefined,
+            blockNode: true,
             ...treeProps,
             data,
             checkStrictly: treeCheckStrictly,
@@ -59,9 +86,19 @@
             loadMore,
             filterTreeNode: computedFilterTreeNode,
             size,
+            checkable: isCheckable,
+            selectable: isSelectable,
+            searchValue: searchValue,
           }"
+          :tree-slots="pickSubCompSlots($slots, 'tree')"
           @change="onSelectChange"
         />
+        <div
+          v-if="$slots.footer && (!isEmpty || showFooterOnEmpty)"
+          :class="`${prefixCls}-footer`"
+        >
+          <slot name="footer" />
+        </div>
       </div>
     </template>
   </Trigger>
@@ -76,24 +113,40 @@ import {
   reactive,
   ref,
   toRefs,
+  StyleValue,
+  inject,
 } from 'vue';
 import useMergeState from '../_hooks/use-merge-state';
-import { LabelValue, TreeSelectProps } from './interface';
-import Trigger from '../trigger';
+import { LabelValue } from './interface';
+import Trigger, { TriggerProps } from '../trigger';
 import SelectView from '../_components/select-view/select-view';
-import Panel from './panel.vue';
+import Panel from './panel';
 import { getPrefixCls } from '../_utils/global-config';
+import { configProviderInjectionKey } from '../config-provider/context';
 import useSelectedState from './hooks/use-selected-state';
 import useTreeData from '../tree/hooks/use-tree-data';
-import { FieldNames, TreeNodeData, TreeProps } from '../tree/interface';
-import { isArray, isEmptyObject } from '../_utils/is';
+import {
+  TreeFieldNames,
+  TreeNodeData,
+  TreeProps,
+  TreeNodeKey,
+  Node,
+} from '../tree/interface';
+import { isUndefined, isFunction, isObject } from '../_utils/is';
 import Empty from '../empty';
 import useFilterTreeNode from './hooks/use-filter-tree-node';
 import Spin from '../spin';
-
-const isEmpty = (val: any) => {
-  return !val || (isArray(val) && val.length === 0) || isEmptyObject(val);
-};
+import pickSubCompSlots from '../_utils/pick-sub-comp-slots';
+import { Size } from '../_utils/constant';
+import { useFormItem } from '../_hooks/use-form-item';
+import {
+  getCheckedStateByCheck,
+  isNodeCheckable,
+} from '../tree/utils/check-utils';
+import { isNodeSelectable } from '../tree/utils';
+import { Data } from '../_utils/types';
+import { ScrollbarProps } from '../scrollbar';
+import { SelectViewValue } from '../_components/select-view/interface';
 
 export default defineComponent({
   name: 'TreeSelect',
@@ -128,12 +181,13 @@ export default defineComponent({
       type: Boolean,
     },
     /**
-     * @zh 选择框的大小。对应 `24px`, `28px`, `32px`, `36px`
-     * @en The size of the selection box. Corresponds to `24px`, `28px`, `32px`, `36px`
+     * @zh 选择框的大小
+     * @en The size of the selection box.
+     * @values 'mini','small','medium','large'
+     * @defaultValue 'medium'
      * */
     size: {
-      type: String as PropType<'mini' | 'small' | 'medium' | 'large'>,
-      default: 'medium',
+      type: String as PropType<Size>,
     },
     /**
      * @zh 是否显示边框
@@ -141,13 +195,18 @@ export default defineComponent({
      * */
     border: {
       type: Boolean,
+      default: true,
     },
     /**
      * @zh 是否允许搜索
      * @en Whether to allow searching
+     * @defaultValue false (single) \| true (multiple)
      * */
     allowSearch: {
-      type: Boolean,
+      type: [Boolean, Object] as PropType<
+        boolean | { retainInputValue?: boolean }
+      >,
+      default: (props: Data) => Boolean(props.multiple),
     },
     /**
      * @zh 是否允许清除
@@ -164,18 +223,10 @@ export default defineComponent({
       type: String,
     },
     /**
-     * @zh 是否在搜索框聚焦时保留现有内容
-     * @en Whether to keep existing content when the search box is focused
-     * */
-    retainInputValue: {
-      type: Boolean,
-      default: true,
-    },
-    /**
      * @zh 最多显示的标签数量，仅在多选模式有效
      * @en The maximum number of labels displayed, only valid in multi-select mode
      * */
-    maxTags: {
+    maxTagCount: {
       type: Number,
     },
     /**
@@ -191,8 +242,8 @@ export default defineComponent({
      * @en Default value
      * */
     defaultValue: {
-      type: [String, Array, Object] as PropType<
-        string | string[] | LabelValue | LabelValue[]
+      type: [String, Number, Array, Object] as PropType<
+        string | number | Array<string | number> | LabelValue | LabelValue[]
       >,
     },
     /**
@@ -200,8 +251,8 @@ export default defineComponent({
      * @en Value
      * */
     modelValue: {
-      type: [String, Array, Object] as PropType<
-        string | string[] | LabelValue | LabelValue[]
+      type: [String, Number, Array, Object] as PropType<
+        string | number | Array<string | number> | LabelValue | LabelValue[]
       >,
     },
     /**
@@ -209,7 +260,7 @@ export default defineComponent({
      * @en Specify the field name in the node data
      * */
     fieldNames: {
-      type: Object as PropType<FieldNames>,
+      type: Object as PropType<TreeFieldNames>,
     },
     /**
      * @zh 数据
@@ -256,11 +307,11 @@ export default defineComponent({
       type: Object as PropType<Partial<TreeProps>>,
     },
     /**
-     * @zh 可以接受所有 [Tigger](/vue/component/trigger) 组件的Props
-     * @en Can accept Props of all [Tigger](/vue/component/trigger) components
+     * @zh 可以接受所有 [Trigger](/vue/component/trigger) 组件的Props
+     * @en Can accept Props of all [Trigger](/vue/component/trigger) components
      * */
     triggerProps: {
-      type: Object as PropType<Record<string, any>>,
+      type: Object as PropType<Partial<TriggerProps>>,
     },
     /**
      * @zh 弹出框是否可见
@@ -320,38 +371,130 @@ export default defineComponent({
      * @en Mount container for pop-up box
      */
     popupContainer: {
-      type: [String, Object] as PropType<
-        string | HTMLElement | null | undefined
+      type: [String, Object] as PropType<string | HTMLElement>,
+    },
+    /**
+     * @zh 为 value 中找不到匹配项的 key 定义节点数据
+     * @en Customize node data for keys that do not match options
+     * @version 2.22.0
+     */
+    fallbackOption: {
+      type: [Boolean, Function] as PropType<
+        boolean | ((key: number | string) => TreeNodeData | boolean)
       >,
+      default: true,
+    },
+    /**
+     * @zh 设置可选择的节点，默认全部可选
+     * @en Set the nodes that can be selected, all can be selected by default
+     * @version 2.27.0
+     */
+    selectable: {
+      type: [Boolean, String, Function] as PropType<
+        | boolean
+        | 'leaf'
+        | ((
+            node: TreeNodeData,
+            info: { isLeaf: boolean; level: number }
+          ) => boolean)
+      >,
+      default: true,
+    },
+    /**
+     * @zh 是否开启虚拟滚动条
+     * @en Whether to enable virtual scroll bar
+     * @version 2.39.0
+     */
+    scrollbar: {
+      type: [Boolean, Object] as PropType<boolean | ScrollbarProps>,
+      default: true,
+    },
+    /**
+     * @zh 空状态时是否显示header
+     * @en Whether to display the header in the empty state
+     */
+    showHeaderOnEmpty: {
+      type: Boolean as PropType<boolean>,
+      default: false,
+    },
+    /**
+     * @zh 空状态时是否显示footer
+     * @en Whether to display the footer in the empty state
+     */
+    showFooterOnEmpty: {
+      type: Boolean as PropType<boolean>,
+      default: false,
+    },
+    /**
+     * @zh 输入框的值
+     * @en The value of the input
+     * @vModel
+     * @version 2.55.0
+     */
+    inputValue: {
+      type: String,
+    },
+    /**
+     * @zh 输入框的默认值（非受控模式）
+     * @en The default value of the input (uncontrolled mode)
+     * @version 2.55.0
+     */
+    defaultInputValue: {
+      type: String,
+      default: '',
     },
   },
-  emits: [
+  emits: {
     /**
      * @zh 值改变时触发
      * @en Trigger when the value changes
-     * @param {string | LabelValue | string[] | LabelValue[] | undefined} selectedValue
+     * @param {string | number | LabelValue | Array<string | number> | LabelValue[] | undefined} value
      */
-    'change',
-    'update:modelValue',
+    'change': (
+      value:
+        | string
+        | number
+        | LabelValue
+        | Array<string | number>
+        | LabelValue[]
+        | undefined
+    ) => true,
+    'update:modelValue': (
+      value:
+        | string
+        | number
+        | LabelValue
+        | Array<string | number>
+        | LabelValue[]
+        | undefined
+    ) => true,
+    'update:inputValue': (inputValue: string) => true,
     /**
      * @zh 下拉框显示状态改变时触发
      * @en Triggered when the status of the drop-down box changes
      * @param {boolean} visible
      */
-    'popup-visible-change',
-    'update:popupVisible',
+    'popup-visible-change': (visible: boolean) => true,
+    'update:popupVisible': (visible: boolean) => true,
     /**
      * @zh 搜索值变化时触发
      * @en Triggered when the search value changes
      * @param {string} searchKey
      */
-    'search',
+    'search': (searchKey: string) => true,
     /**
      * @zh 点击清除时触发
      * @en Triggered when clear is clicked
      * */
-    'clear',
-  ],
+    'clear': () => true,
+    /**
+     * @zh 输入框的值发生改变时触发
+     * @en Triggered when the value of the input changes
+     * @param {string} inputValue
+     * @version 2.55.0
+     */
+    'inputValueChange': (inputValue: string) => true,
+  },
   /**
    * @zh 自定义触发元素
    * @en Custom trigger element
@@ -363,9 +506,10 @@ export default defineComponent({
    * @slot prefix
    */
   /**
-   * @zh 标签
-   * @en Tag
-   * @slot tag
+   * @zh 自定义选择框显示
+   * @en Custom Label
+   * @slot label
+   * @binding data
    */
   /**
    * @zh 定制加载中显示的内容
@@ -377,7 +521,41 @@ export default defineComponent({
    * @en Custom empty data display
    * @slot empty
    */
-  setup(props: TreeSelectProps, { emit }) {
+  /**
+   * @zh 定制 tree 组件的 switcher 图标
+   * @en Custom switcher icon for the tree component
+   * @slot tree-slot-switcher-icon
+   */
+  /**
+   * @zh 定制 tree 组件的节点图标
+   * @en Custom node icon for the tree component
+   * @slot tree-slot-icon
+   * @binding {TreeNodeData} node
+   * @version 2.18.0
+   */
+
+  /**
+   * @zh 定制 tree 组件的节点标题
+   * @en Custom the node title of the tree component
+   * @slot tree-slot-title
+   * @binding {string} title
+   */
+  /**
+   * @zh 定制 tree 组件的渲染额外节点内容
+   * @en Render additional node content of the tree component
+   * @slot tree-slot-extra
+   */
+  /**
+   * @zh 自定义下拉框页头
+   * @en The header of the drop-down box
+   * @slot header
+   */
+  /**
+   * @zh 自定义下拉框页脚
+   * @en The footer of the drop-down box
+   * @slot footer
+   */
+  setup(props, { emit, slots }) {
     const {
       defaultValue,
       modelValue,
@@ -388,53 +566,128 @@ export default defineComponent({
       treeCheckStrictly,
       data,
       fieldNames,
+      disabled,
       labelInValue,
       filterTreeNode,
       disableFilter,
       dropdownStyle,
       treeProps,
+      fallbackOption,
+      selectable,
+      dropdownClassName,
     } = toRefs(props);
-
+    const { mergedDisabled, eventHandlers } = useFormItem({
+      disabled,
+    });
     const prefixCls = getPrefixCls('tree-select');
-
+    const configCtx = inject(configProviderInjectionKey, undefined);
+    const TreeSelectEmpty = configCtx?.slots.empty?.({
+      component: 'tree-select',
+    })?.[0];
     const isMultiple = computed(() => multiple.value || treeCheckable.value);
-
+    const isSelectable = (
+      node: TreeNodeData,
+      info: { level: number; isLeaf: boolean }
+    ) => {
+      if (selectable.value === 'leaf') return info.isLeaf;
+      if (isFunction(selectable.value)) return selectable.value(node, info);
+      return selectable.value ?? false;
+    };
+    const isCheckable = computed(() =>
+      treeCheckable.value ? isSelectable : false
+    );
+    const retainInputValue = computed(
+      () =>
+        isObject(props.allowSearch) &&
+        Boolean(props.allowSearch.retainInputValue)
+    );
     const { flattenTreeData, key2TreeNode } = useTreeData(
       reactive({
         treeData: data,
         fieldNames,
-        selectable: true,
-        checkable: treeCheckable,
+        selectable: isSelectable,
+        checkable: isCheckable,
       })
     );
 
-    const { selectedKeys, selectedValue, setLocalSelectedKeys } =
-      useSelectedState(
-        reactive({
-          defaultValue,
-          modelValue,
-          key2TreeNode,
-          multiple,
-          treeCheckable,
-          treeCheckStrictly,
-        })
-      );
+    const {
+      selectedKeys,
+      selectedValue,
+      setLocalSelectedKeys,
+      localSelectedKeys,
+      localSelectedValue,
+    } = useSelectedState(
+      reactive({
+        defaultValue,
+        modelValue,
+        key2TreeNode,
+        multiple,
+        treeCheckable,
+        treeCheckStrictly,
+        fallbackOption,
+        fieldNames,
+      })
+    );
 
-    const setSelectedKeys = (newVal: string[]) => {
+    function isNodeClosable(node: Node) {
+      return treeCheckable.value
+        ? isNodeCheckable(node)
+        : isNodeSelectable(node);
+    }
+
+    const selectViewValue = computed(() => {
+      if (isUndefined(selectedValue.value)) {
+        return [];
+      }
+      if (isMultiple.value && !mergedDisabled.value) {
+        return selectedValue.value.map((i) => {
+          const node = key2TreeNode.value.get(i.value);
+          return {
+            ...i,
+            closable: !node || isNodeClosable(node),
+          };
+        }) as SelectViewValue[];
+      }
+      return selectedValue.value as SelectViewValue[];
+    });
+
+    const setSelectedKeys = (newVal: TreeNodeKey[]) => {
       setLocalSelectedKeys(newVal);
 
       nextTick(() => {
-        let emitValue: string | string[] | LabelValue | LabelValue[] =
-          labelInValue.value ? selectedValue.value : newVal;
+        const forEmitValue =
+          (labelInValue.value
+            ? localSelectedValue.value
+            : localSelectedKeys.value) || [];
 
-        emitValue = isMultiple.value ? emitValue : emitValue[0];
+        const emitValue = isMultiple.value ? forEmitValue : forEmitValue[0];
 
-        emit('change', emitValue);
         emit('update:modelValue', emitValue);
+        emit('change', emitValue);
+        eventHandlers.value?.onChange?.();
       });
     };
 
-    const searchValue = ref('');
+    const _inputValue = ref(props.defaultInputValue);
+    const computedInputValue = computed(
+      () => props.inputValue ?? _inputValue.value
+    );
+
+    const updateInputValue = (inputValue: string) => {
+      _inputValue.value = inputValue;
+      emit('update:inputValue', inputValue);
+      emit('inputValueChange', inputValue);
+    };
+
+    const handleInputValueChange = (inputValue: string) => {
+      if (inputValue !== computedInputValue.value) {
+        setPanelVisible(true);
+        updateInputValue(inputValue);
+        if (props.allowSearch) {
+          emit('search', inputValue);
+        }
+      }
+    };
 
     const [panelVisible, setLocalPanelVisible] = useMergeState(
       defaultPopupVisible.value,
@@ -459,53 +712,83 @@ export default defineComponent({
     const { isEmptyFilterResult, filterTreeNode: computedFilterTreeNode } =
       useFilterTreeNode(
         reactive({
-          searchValue,
+          searchValue: computedInputValue,
           flattenTreeData,
           filterMethod: filterTreeNode,
           disableFilter,
+          fieldNames,
         })
       );
 
-    const isEmptyTreeData = computed(() => isEmpty(key2TreeNode.value));
+    const isEmpty = computed(
+      () => !flattenTreeData.value.length || isEmptyFilterResult.value
+    );
 
     const refSelectView = ref();
 
-    const computedDropdownStyle = computed<Array<CSSProperties | undefined>>(
-      () => [
-        dropdownStyle?.value,
-        treeProps?.value?.virtualListProps ? { 'max-height': 'unset' } : {},
-      ]
-    );
+    const computedDropdownStyle = computed<StyleValue[]>(() => [
+      dropdownStyle?.value || {},
+      treeProps?.value?.virtualListProps ? { 'max-height': 'unset' } : {},
+    ]);
+
+    const onBlur = () => {
+      if (!retainInputValue.value && computedInputValue.value) {
+        updateInputValue('');
+      }
+    };
 
     return {
       refSelectView,
       prefixCls,
+      TreeSelectEmpty,
       selectedValue,
       selectedKeys,
-      searchValue,
+      mergedDisabled,
+      searchValue: computedInputValue,
       panelVisible,
-      isEmptyTreeData,
-      isEmptyFilterResult,
+      isEmpty,
       computedFilterTreeNode,
       isMultiple,
+      selectViewValue,
       computedDropdownStyle,
-      onSearchValueChange(newVal: string) {
-        setPanelVisible(true);
-        searchValue.value = newVal;
-        emit('search', newVal);
-      },
+      onSearchValueChange: handleInputValueChange,
       onSelectChange(newVal: string[]) {
         setSelectedKeys(newVal);
-        searchValue.value = '';
+        if (!retainInputValue.value && computedInputValue.value) {
+          updateInputValue('');
+        }
 
         if (!isMultiple.value) {
           setPanelVisible(false);
         }
       },
       onVisibleChange: setPanelVisible,
-      onClear() {
+      onInnerClear() {
         setSelectedKeys([]);
         emit('clear');
+      },
+      pickSubCompSlots,
+      isSelectable,
+      isCheckable,
+      onBlur,
+      onItemRemove(id: string) {
+        if (mergedDisabled.value) return;
+        const node = key2TreeNode.value.get(id);
+        if (treeCheckable.value && node) {
+          if (isNodeClosable(node)) {
+            const [newVal] = getCheckedStateByCheck({
+              node,
+              checked: false,
+              checkedKeys: selectedKeys.value,
+              indeterminateKeys: [],
+              checkStrictly: treeCheckStrictly.value,
+            });
+            setSelectedKeys(newVal);
+          }
+        } else {
+          const newVal = selectedKeys.value.filter((i) => i !== id);
+          setSelectedKeys(newVal);
+        }
       },
     };
   },

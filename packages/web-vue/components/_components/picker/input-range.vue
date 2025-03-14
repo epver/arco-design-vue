@@ -1,5 +1,8 @@
 <template>
   <div :class="classNames">
+    <div v-if="$slots.prefix" :class="`${prefixCls}-prefix`">
+      <slot name="prefix" />
+    </div>
     <div :class="getInputWrapClassName(0)">
       <input
         ref="refInput0"
@@ -31,7 +34,7 @@
     </div>
     <div :class="`${prefixCls}-suffix`">
       <IconHover
-        v-if="allowClear && !disabled && value.length === 2"
+        v-if="allowClear && !mergedDisabled && value.length === 2"
         :prefix="prefixCls"
         :class="`${prefixCls}-clear-icon`"
         @click="onClear"
@@ -41,6 +44,7 @@
       <span :class="`${prefixCls}-suffix-icon`">
         <slot name="suffix-icon" />
       </span>
+      <FeedbackIcon v-if="feedback" :type="feedback" />
     </div>
   </div>
 </template>
@@ -48,6 +52,7 @@
 import { Dayjs } from 'dayjs';
 import { computed, defineComponent, PropType, ref, toRefs } from 'vue';
 import { getPrefixCls } from '../../_utils/global-config';
+import FeedbackIcon from '../feedback-icon.vue';
 import {
   isArray,
   isDayjs,
@@ -57,17 +62,19 @@ import {
 } from '../../_utils/is';
 import IconClose from '../../icon/icon-close';
 import IconHover from '../icon-hover.vue';
+import { useFormItem } from '../../_hooks/use-form-item';
+import { useSize } from '../../_hooks/use-size';
 
 export default defineComponent({
   name: 'DateInputRange',
   components: {
     IconHover,
     IconClose,
+    FeedbackIcon,
   },
   props: {
     size: {
       type: String as PropType<'mini' | 'small' | 'medium' | 'large'>,
-      required: true,
     },
     focused: {
       type: Boolean,
@@ -111,7 +118,7 @@ export default defineComponent({
     'clear',
     'press-enter',
   ],
-  setup(props, { emit }) {
+  setup(props, { emit, slots }) {
     const {
       error,
       focused,
@@ -122,11 +129,21 @@ export default defineComponent({
       focusedIndex,
       inputValue,
     } = toRefs(props);
+    const {
+      mergedSize: _mergedSize,
+      mergedDisabled,
+      mergedError,
+      feedback,
+    } = useFormItem({ size, error });
+    const { mergedSize } = useSize(_mergedSize);
 
     const refInput0 = ref<HTMLInputElement>();
     const refInput1 = ref<HTMLInputElement>();
 
     const getDisabled = (index: number): boolean => {
+      if (mergedDisabled.value) {
+        return mergedDisabled.value;
+      }
       return isArray(disabled.value) ? disabled.value[index] : disabled.value;
     };
     const disabled0 = computed(() => getDisabled(0));
@@ -137,11 +154,12 @@ export default defineComponent({
     const classNames = computed(() => [
       prefixCls,
       `${prefixCls}-range`,
-      `${prefixCls}-size-${size.value}`,
+      `${prefixCls}-size-${mergedSize.value}`,
       {
         [`${prefixCls}-focused`]: focused.value,
         [`${prefixCls}-disabled`]: disabled0.value && disabled1.value,
-        [`${prefixCls}-error`]: error.value,
+        [`${prefixCls}-error`]: mergedError.value,
+        [`${prefixCls}-has-prefix`]: slots.prefix,
       },
     ]);
 
@@ -188,8 +206,8 @@ export default defineComponent({
       e.preventDefault();
     }
 
-    function onClear() {
-      emit('clear');
+    function onClear(e: Event) {
+      emit('clear', e);
     }
 
     return {
@@ -199,6 +217,7 @@ export default defineComponent({
       refInput1,
       disabled0,
       disabled1,
+      mergedDisabled,
       getDisabled,
       getInputWrapClassName,
       displayValue0,
@@ -208,6 +227,7 @@ export default defineComponent({
       onPressEnter,
       onPressTab,
       onClear,
+      feedback,
     };
   },
   methods: {

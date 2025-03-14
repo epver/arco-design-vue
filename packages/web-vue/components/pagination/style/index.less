@@ -6,7 +6,7 @@
   font-size: ~'@{pagination-size-@{size}-font-size}';
   line-height: ~'@{pagination-size-@{size}}';
 
-  &-prev,
+  &-previous,
   &-next {
     font-size: ~'@{pagination-size-icon-arrow_@{size}}';
   }
@@ -32,12 +32,14 @@
     display: inline-block;
     margin: 0;
     padding: 0;
+    white-space: nowrap;
     list-style: none;
   }
 
   &-item {
     display: inline-block;
     box-sizing: border-box;
+    padding: 0 @pagination-padding-horizontal;
     color: @pagination-color-item-text;
     text-align: center;
     vertical-align: middle;
@@ -51,20 +53,14 @@
 
     .page-item(default);
 
-    &-disabled {
-      color: @pagination-color-item-text_disabled;
-      background-color: @pagination-color-bg-item_disabled;
-      border-color: @pagination-color-item-border_disabled;
-      cursor: not-allowed;
-    }
-
-    &:not(&-disabled):not(&-active):hover {
+    &:hover {
       color: @pagination-color-item-text_hover;
       background-color: @pagination-color-bg-item_hover;
       border-color: @pagination-color-item-border_hover;
     }
 
-    &-active {
+    &-active,
+    &-active:hover {
       color: @pagination-color-item-text_active;
       background-color: @pagination-color-bg-item_active;
       border-color: @pagination-color-item-border_active;
@@ -74,12 +70,20 @@
           @transition-timing-function-linear;
     }
 
+    &-disabled,
+    &-disabled:hover {
+      color: @pagination-color-item-text_disabled;
+      background-color: @pagination-color-bg-item_disabled;
+      border-color: @pagination-color-item-border_disabled;
+      cursor: not-allowed;
+    }
+
     &:not(:last-child) {
       margin-right: @pagination-item-spacing;
     }
   }
 
-  &-item-prev,
+  &-item-previous,
   &-item-next {
     color: @pagination-color-icon-arrow;
     font-size: @pagination-size-icon-arrow_default;
@@ -99,7 +103,7 @@
     }
   }
 
-  & &-item-prev&-item-disabled,
+  & &-item-previous&-item-disabled,
   & &-item-next&-item-disabled {
     color: @pagination-color-icon-arrow-text_disabled;
     background-color: @pagination-color-icon-arrow-bg_disabled;
@@ -110,21 +114,32 @@
   }
 
   /*** 快速跳转 ***/
-
   &-jumper {
+    display: flex;
+    align-items: center;
     margin-left: @pagination-margin-jumper-left;
 
     > span {
       font-size: @pagination-size-default-font-size;
     }
 
-    &-text-goto {
+    &-text-goto,
+    &-prepend,
+    &-append {
       color: @pagination-color-jumper-goto;
+      white-space: nowrap;
     }
 
-    &-input {
-      width: @patination-jumper-input-width;
+    &-prepend {
+      margin-right: @pagination-item-spacing;
+    }
+
+    &-append {
       margin-left: @pagination-item-spacing;
+    }
+
+    & &-input {
+      width: @patination-jumper-input-width;
       padding-right: 2px;
       padding-left: 2px;
 
@@ -134,9 +149,10 @@
     }
   }
 
-  &-option {
+  &-options {
     position: relative;
     display: inline-block;
+    flex: 0 0 auto;
     min-width: 0;
     margin-left: @pagination-margin-option-left;
     text-align: center;
@@ -150,8 +166,6 @@
         overflow: inherit;
       }
     }
-
-    .option(default);
   }
 
   &-total {
@@ -161,18 +175,22 @@
     color: @pagination-color-text-total;
     font-size: @pagination-size-default-font-size;
     .total(default);
+
+    white-space: nowrap;
   }
 
   // simple
-
   &-jumper {
+    flex: 0 0 auto;
+
     &-separator {
       padding: 0 @pagination-simple-margin-separator-right 0
         @pagination-simple-margin-separator-left;
     }
 
     &-total-page {
-      margin-right: @pagination-simple-margin-next-left - @pagination-simple-margin-prev-right;
+      margin-right: @pagination-simple-margin-next-left -
+        @pagination-simple-margin-prev-right;
     }
   }
 
@@ -187,7 +205,7 @@
 
   &-simple &-jumper {
     margin: 0 @pagination-simple-margin-prev-right;
-    color: var(--color-text-1);
+    color: var(~'@{arco-cssvars-prefix}-color-text-1');
   }
 
   &-simple &-jumper &-jumper-input {
@@ -195,7 +213,7 @@
     margin-left: 0;
   }
 
-  &-simple &-item-prev,
+  &-simple &-item-previous,
   &-simple &-item-next {
     color: @pagination-simple-color-icon-arrow;
     background-color: @pagination-simple-color-icon-arrow-bg;
@@ -206,7 +224,7 @@
     }
   }
 
-  &-simple &-item-prev&-item-disabled,
+  &-simple &-item-previous&-item-disabled,
   &-simple &-item-next&-item-disabled {
     color: @pagination-simple-color-icon-arrow-text_disabled;
     background-color: @pagination-simple-color-icon-arrow-bg_disabled;

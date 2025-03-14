@@ -1,13 +1,17 @@
 <template>
   <Trigger
     trigger="click"
+    animation-name="slide-dynamic-origin"
+    auto-fit-transform-origin
     :click-to-close="false"
     :position="position"
-    :disabled="disabled"
+    :disabled="mergedDisabled || readonly"
     :popup-offset="4"
     :popup-visible="panelVisible"
+    :prevent-focus="true"
     :unmount-on-close="unmountOnClose"
     :popup-container="popupContainer"
+    v-bind="{ ...triggerProps }"
     @popupVisibleChange="onPanelVisibleChange"
   >
     <component
@@ -23,13 +27,17 @@
       :focused="panelVisible"
       :format="computedFormat"
       :visible="panelVisible"
-      :disabled="disabled"
+      :disabled="mergedDisabled"
       :error="error"
+      :readonly="readonly"
       :editable="!readonly"
-      :allow-clear="allowClear"
+      :allow-clear="allowClear && !readonly"
       :placeholder="computedPlaceholder"
       @clear="onInputClear"
     >
+      <template v-if="$slots.prefix" #prefix>
+        <slot name="prefix"> </slot>
+      </template>
       <template #suffix-icon>
         <slot name="suffix-icon">
           <IconClockCircle />
@@ -83,11 +91,10 @@ import {
 } from '../_utils/date';
 import { isArray, isUndefined } from '../_utils/is';
 import { getPrefixCls } from '../_utils/global-config';
-import Trigger from '../trigger';
+import Trigger, { TriggerProps } from '../trigger';
 import DateInput from '../_components/picker/input.vue';
 import DateRangeInput from '../_components/picker/input-range.vue';
 import IconClockCircle from '../icon/icon-clock-circle';
-import { TimePickerProps } from './interface';
 import useState from '../_hooks/use-state';
 import useTimeFormat from './hooks/use-time-format';
 import useTimeState from './hooks/use-time-state';
@@ -101,6 +108,8 @@ import RangePanel from './range-panel';
 import useIsDisabledTime from './hooks/use-is-disabled-time';
 import useMergeState from '../_hooks/use-merge-state';
 import { useI18n } from '../locale';
+import { Size } from '../_utils/constant';
+import { useFormItem } from '../_hooks/use-form-item';
 
 export default defineComponent({
   name: 'TimePicker',
@@ -182,15 +191,16 @@ export default defineComponent({
      * @en Prompt copy
      * */
     placeholder: {
-      type: String,
+      type: [String, Array] as PropType<string | string[]>,
     },
     /**
      * @zh 输入框尺寸
      * @en Input box size
+     * @values 'mini','small','medium','large'
+     * @defaultValue 'medium'
      * */
     size: {
-      type: String as PropType<'mini' | 'small' | 'medium' | 'large'>,
-      default: 'medium',
+      type: String as PropType<Size>,
     },
     /**
      * @zh 弹出框的挂载容器
@@ -284,7 +294,7 @@ export default defineComponent({
      * @en You can pass in the parameters of the `Trigger` component
      * */
     triggerProps: {
-      type: Object as PropType<Record<string, unknown>>,
+      type: Object as PropType<TriggerProps>,
     },
     /**
      * @zh 是否在关闭后销毁 dom 结构
@@ -294,41 +304,60 @@ export default defineComponent({
       type: Boolean,
     },
   },
-  emits: [
+  emits: {
     /**
      * @zh 组件值发生改变
      * @en The component value changes
      * @param {string | Array<string | undefined> | undefined} timeString
      * @param {date | Array<date | undefined> | undefined} time
      */
-    'change',
-    'update:modelValue',
+    'change': (
+      timeString: string | Array<string | undefined> | undefined,
+      time: Date | Array<Date | undefined> | undefined
+    ) => true,
+    'update:modelValue': (
+      timeString: string | Array<string | undefined> | undefined
+    ) => true,
     /**
      * @zh 选择时间但未触发组件值变化
      * @en Select time but do not trigger component value change
      * @param {string | Array<string | undefined>} timeString
      * @param {Date | Array<Date | undefined>} time
      */
-    'select',
+    'select': (
+      timeString: string | Array<string | undefined>,
+      time: Date | Array<Date | undefined>
+    ) => true,
     /**
      * @zh 点击清除按钮
      * @en Click the clear button
      * */
-    'clear',
+    'clear': () => true,
     /**
      * @zh 弹出框展开和收起
      * @en Pop-up box expand and collapse
      * @param {boolean} visible
      */
-    'popup-visible-change',
-    'update:popupVisible',
-  ],
+    'popup-visible-change': (visible: boolean) => true,
+    'update:popupVisible': (visible: boolean) => true,
+  },
+  /**
+   * @zh 输入框前缀
+   * @en Input box prefix
+   * @slot prefix
+   * @version 2.41.0
+   */
+  /**
+   * @zh 输入框后缀图标
+   * @en Input box suffix icon
+   * @slot suffix-icon
+   */
   /**
    * @zh 额外的页脚
    * @en Extra footer
    * @slot extra
    */
-  setup(props: TimePickerProps, { emit }) {
+  setup(props, { emit }) {
     const {
       type,
       format,
@@ -344,6 +373,8 @@ export default defineComponent({
       disabledMinutes,
       disabledSeconds,
     } = toRefs(props);
+
+    const { mergedDisabled, eventHandlers } = useFormItem({ disabled });
 
     const isRange = computed(() => type.value === 'time-range');
     const prefixCls = getPrefixCls('timepicker');
@@ -421,8 +452,9 @@ export default defineComponent({
       if (isValueChange(value, computedValue.value)) {
         const formattedValue = getFormattedValue(value, computedFormat.value);
         const dateValue = getDateValue(value);
-        emit('change', formattedValue, dateValue);
         emit('update:modelValue', formattedValue);
+        emit('change', formattedValue, dateValue);
+        eventHandlers.value?.onChange?.();
       }
     }
 
@@ -476,7 +508,7 @@ export default defineComponent({
     }
 
     function onPanelVisibleChange(newVisible: boolean) {
-      if (disabled.value) return;
+      if (mergedDisabled.value) return;
       setPanelVisible(newVisible);
 
       if (newVisible) {
@@ -571,9 +603,10 @@ export default defineComponent({
       }
     }
 
-    function onClear() {
+    function onClear(e: Event) {
+      e.stopPropagation();
       setPanelValue(undefined);
-      confirm(undefined, true);
+      confirm(undefined, isRange.value);
     }
 
     // 1. 每次打开关闭重新赋值 panelValue
@@ -629,6 +662,7 @@ export default defineComponent({
       computedUse12Hours,
       inputProps,
       panelProps,
+      mergedDisabled,
       onPanelVisibleChange: onPanelVisibleChange as any,
       onInputClear: onClear,
       onPanelSelect,

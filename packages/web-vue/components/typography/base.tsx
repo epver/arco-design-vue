@@ -5,21 +5,21 @@ import {
   toRefs,
   computed,
   ref,
-  Text,
   onUnmounted,
   VNodeTypes,
   watch,
   reactive,
+  onMounted,
+  onUpdated,
 } from 'vue';
 import { getPrefixCls } from '../_utils/global-config';
-import { isObject, isString, isUndefined } from '../_utils/is';
+import { isObject } from '../_utils/is';
 import { BaseProps, EllipsisConfig, EllipsisInternalConfig } from './interface';
 import EditContent from './edit-content.vue';
 import Operations from './operations.vue';
 import ResizeObserver from '../_components/resize-observer';
 import { omit } from '../_utils/omit';
 import useMergeState from '../_hooks/use-merge-state';
-import usePickSlots from '../_hooks/use-pick-slots';
 import measure from './utils/measure';
 import { clipboard } from '../_utils/clipboard';
 import getInnerText from './utils/getInnerText';
@@ -29,20 +29,6 @@ import Popover from '../popover';
 
 interface BaseInternalProps extends BaseProps {
   component: keyof HTMLElementTagNameMap;
-}
-
-function getClassNames(prefixCls: string, props: BaseInternalProps) {
-  const { type, disabled } = props;
-  const classNames = [];
-
-  if (type) {
-    classNames.push(`${prefixCls}-${type}`);
-  }
-  if (disabled) {
-    classNames.push(`${prefixCls}-disabled`);
-  }
-
-  return classNames;
 }
 
 function getComponentTags<K extends keyof HTMLElementTagNameMap>(
@@ -70,36 +56,16 @@ function getComponentTags<K extends keyof HTMLElementTagNameMap>(
   return componentTags as K[];
 }
 
-// 目前只能处理纯文字内容的编辑
-function getEditText(children: VNode[]) {
-  if (!children) return '';
-
-  const res: string[] = [];
-  children.some((child) => {
-    if (child.type === Text && isString(child.children)) {
-      res.push(String(child.children));
-      return true;
-    }
-    return false;
-  });
-
-  return res.join('');
-}
-
 function Wrap(props: BaseInternalProps, children: VNodeTypes) {
   const { mark } = props;
   const componentTags = getComponentTags(props);
+  const markStyle =
+    isObject(mark) && mark.color ? { backgroundColor: mark.color } : {};
 
-  let content: VNodeTypes = children;
-  componentTags.forEach((Tag) => {
-    const attrs =
-      isObject(mark) && mark.color
-        ? { style: { backgroundColor: mark.color } }
-        : {};
-    content = <Tag {...attrs}>{content}</Tag>;
-  });
-
-  return content;
+  return componentTags.reduce((content, Tag) => {
+    const attrs = Tag === 'mark' ? { style: markStyle } : {};
+    return <Tag {...attrs}>{content}</Tag>;
+  }, children);
 }
 
 function normalizeEllipsisConfig(
@@ -118,6 +84,7 @@ function normalizeEllipsisConfig(
     suffix: '',
     ellipsisStr: '...',
     expandable: false,
+    css: false,
     ...omit(config, ['showTooltip']),
     showTooltip,
     TooltipComponent,
@@ -131,6 +98,7 @@ function normalizeEllipsisConfig(
  */
 export default defineComponent({
   name: 'TypographyBase',
+  inheritAttrs: false,
   props: {
     component: {
       type: String as PropType<BaseInternalProps['component']>,
@@ -234,52 +202,77 @@ export default defineComponent({
       type: String,
     },
     /**
-     * @zh 自动溢出省略，具体参数配置看 [EllipsisConfig](#ellipsisconfig)
-     * @en Automatic overflow omission, refer to [EllipsisConfig](#ellipsisconfig) for more information.
+     * @zh 复制成功后，复制按钮恢复到可点击状态的延迟时间，单位是毫秒
+     * @en After the copy is successful, the delay time for the copy button to return to the clickable state, in milliseconds
+     * @version 2.16.0
+     */
+    copyDelay: {
+      type: Number,
+      default: 3000,
+    },
+    /**
+     * @zh 自动溢出省略，具体参数配置看 [EllipsisConfig](#EllipsisConfig)
+     * @en Automatic overflow omission, refer to [EllipsisConfig](#EllipsisConfig) for more information.
      */
     ellipsis: {
       type: [Boolean, Object] as PropType<boolean | EllipsisConfig>,
       default: false,
     },
+    /**
+     * @zh 编辑按钮问题提示配置
+     * @en Edit button question prompt configuration
+     * @version 2.32.0
+     */
+    editTooltipProps: {
+      type: Object,
+    },
+    /**
+     * @zh 拷贝按钮问题提示配置
+     * @en Copy button question prompt configuration
+     * @version 2.32.0
+     */
+    copyTooltipProps: {
+      type: Object,
+    },
   },
-  emits: [
+  emits: {
     /**
      * @zh 开始编辑
      * @en Edit start
      */
-    'editStart',
+    'editStart': () => true,
     /**
      * @zh 编辑内容变化
      * @en Edit content change
+     * @param {string} text
      */
-    'change',
-    'update:editText',
+    'change': (text: string) => true,
+    'update:editText': (text: string) => true,
     /**
      * @zh 编辑结束
      * @en Edit end
-     * @param text {string} Edited text
      */
-    'editEnd',
-    'update:editing',
+    'editEnd': () => true,
+    'update:editing': (editing: boolean) => true,
     /**
      * @zh 复制
      * @en Copy
-     * @param text {string} Copied text
+     * @param {string} text
      */
-    'copy',
+    'copy': (text: string) => true,
     /**
      * @zh 省略变化事件
      * @en Ellipsis change
-     * @param isEllipsis {boolean} Ellipsis state
+     * @param {boolean} isEllipsis
      */
-    'ellipsis',
+    'ellipsis': (isEllipsis: boolean) => true,
     /**
      * @zh 展开收起事件
      * @en Expand collapse event
-     * @param expanded {boolean} Expand state
+     * @param {boolean} expanded
      */
-    'expand',
-  ],
+    'expand': (expanded: boolean) => true,
+  },
   /**
    * @zh 自定义复制按钮的 tooltip 内容
    * @en Customize the tooltip content of the copy button
@@ -298,7 +291,7 @@ export default defineComponent({
    * @slot expand-node
    * @binding {boolean} expanded
    */
-  setup(props: BaseInternalProps, { slots, emit }) {
+  setup(props, { slots, emit, attrs }) {
     const {
       editing: propEditing,
       defaultEditing,
@@ -306,20 +299,22 @@ export default defineComponent({
       copyable,
       editable,
       copyText,
+      editText,
+      copyDelay,
+      component,
     } = toRefs(props);
 
     const prefixCls = getPrefixCls('typography');
     const classNames = computed(() => [
       prefixCls,
-      ...getClassNames(prefixCls, props),
+      {
+        [`${prefixCls}-${props.type}`]: props.type,
+        [`${prefixCls}-disabled`]: props.disabled,
+      },
     ]);
 
     const wrapperRef = ref();
-    const defaultSlot = usePickSlots(slots, 'default');
-    const children = computed<VNode[]>(() => {
-      return defaultSlot.value?.() || [];
-    });
-    const fullText = computed<string>(() => getInnerText(children.value));
+    const fullText = ref('');
 
     // for edit
     const [editing, setEditing] = useMergeState(
@@ -342,6 +337,7 @@ export default defineComponent({
     }
 
     function onEditEnd() {
+      if (!editing.value) return;
       emit('update:editing', false);
       emit('editEnd');
       setEditing(false);
@@ -349,12 +345,10 @@ export default defineComponent({
 
     // for copy
     const isCopied = ref(false);
-    const copyTimer = ref();
+    let copyTimer: NodeJS.Timeout | null = null;
 
     function onCopyClick() {
-      const text = !isUndefined(copyText?.value)
-        ? copyText?.value
-        : fullText.value;
+      const text = copyText.value ?? fullText.value;
 
       clipboard(text || '');
 
@@ -362,14 +356,14 @@ export default defineComponent({
 
       emit('copy', text);
 
-      copyTimer.value = setTimeout(() => {
+      copyTimer = setTimeout(() => {
         isCopied.value = false;
-      }, 3000);
+      }, copyDelay.value);
     }
 
     onUnmounted(() => {
-      copyTimer.value && clearTimeout(copyTimer as any);
-      copyTimer.value = null;
+      copyTimer && clearTimeout(copyTimer);
+      copyTimer = null;
     });
 
     // for ellipsis
@@ -378,10 +372,10 @@ export default defineComponent({
     const ellipsisText = ref('');
     const ellipsisConfig = computed<EllipsisInternalConfig>(() =>
       normalizeEllipsisConfig(
-        (isObject(ellipsis?.value) && ellipsis?.value) || {}
+        (isObject(ellipsis.value) && ellipsis.value) || {}
       )
     );
-    const rafId = ref();
+    let rafId: number = null as any;
 
     function onExpandClick() {
       const newVal = !expanded.value;
@@ -390,6 +384,30 @@ export default defineComponent({
     }
 
     function renderOperations(forceRenderExpand = false) {
+      if (ellipsisConfig.value.css) {
+        return (
+          <Operations
+            editable={editable.value}
+            copyable={copyable.value}
+            expandable={ellipsisConfig.value.expandable}
+            isCopied={isCopied.value}
+            isEllipsis={showCSSTooltip.value}
+            expanded={expanded.value}
+            forceRenderExpand={forceRenderExpand || expanded.value}
+            editTooltipProps={props.editTooltipProps}
+            copyTooltipProps={props.copyTooltipProps}
+            onEdit={onEditStart}
+            onCopy={onCopyClick}
+            onExpand={onExpandClick}
+            v-slots={{
+              'copy-tooltip': slots['copy-tooltip'],
+              'copy-icon': slots['copy-icon'],
+              'expand-node': slots['expand-node'],
+            }}
+          />
+        );
+      }
+
       return (
         <Operations
           editable={editable.value}
@@ -399,6 +417,8 @@ export default defineComponent({
           isEllipsis={isEllipsis.value}
           expanded={expanded.value}
           forceRenderExpand={forceRenderExpand}
+          editTooltipProps={props.editTooltipProps}
+          copyTooltipProps={props.copyTooltipProps}
           onEdit={onEditStart}
           onCopy={onCopyClick}
           onExpand={onExpandClick}
@@ -423,7 +443,9 @@ export default defineComponent({
 
       if (isEllipsis.value !== ellipsis) {
         isEllipsis.value = ellipsis;
-        emit('ellipsis', ellipsis);
+        if (!ellipsisConfig.value.css) {
+          emit('ellipsis', ellipsis);
+        }
       }
 
       if (ellipsisText.value !== text) {
@@ -432,23 +454,26 @@ export default defineComponent({
     }
 
     function resizeOnNextFrame() {
-      const needCalEllipsis = !!ellipsis?.value && !expanded.value;
+      const needCalEllipsis = ellipsis.value && !expanded.value;
       if (!needCalEllipsis) return;
 
-      caf(rafId.value);
-      rafId.value = raf(() => {
+      caf(rafId);
+      rafId = raf(() => {
         calEllipsis();
       });
     }
 
     onUnmounted(() => {
-      caf(rafId.value);
+      caf(rafId);
     });
 
-    const rows = computed(() => ellipsisConfig.value.rows);
-    watch([rows, children], () => {
-      resizeOnNextFrame();
-    });
+    watch(
+      () => ellipsisConfig.value.rows,
+      () => {
+        resizeOnNextFrame();
+      }
+    );
+
     watch(ellipsis, (newVal) => {
       if (newVal) {
         resizeOnNextFrame();
@@ -457,88 +482,150 @@ export default defineComponent({
       }
     });
 
-    return {
-      props,
-      classNames,
-      children,
-      fullText,
-      isEllipsis,
-      expanded,
-      ellipsisText,
-      ellipsisConfig,
-      mergeEditing,
-      wrapperRef,
-      renderOperations,
-      onEditChange,
-      onEditEnd,
-      onResize() {
-        resizeOnNextFrame();
-      },
+    let children: VNode[] = [];
+
+    const updateFullText = () => {
+      if (ellipsis.value || copyable.value || editable.value) {
+        const _fullText = getInnerText(children);
+
+        if (_fullText !== fullText.value) {
+          fullText.value = _fullText;
+          resizeOnNextFrame();
+        }
+      }
     };
-  },
-  render() {
-    const {
-      props,
-      component: Component,
-      classNames,
-      isEllipsis,
-      expanded,
-      ellipsisText,
-      ellipsisConfig,
-      children,
-      fullText,
-      editText,
-      mergeEditing,
-      renderOperations,
-      onResize,
-      onEditChange,
-      onEditEnd,
-    } = this;
 
-    // 编辑中
-    if (mergeEditing) {
-      const _editText = !isUndefined(editText)
-        ? editText
-        : getEditText(children);
+    onMounted(updateFullText);
+    onUpdated(updateFullText);
 
-      return (
-        <EditContent
-          text={_editText}
-          onChange={(text: string) => {
-            if (text !== _editText) {
-              onEditChange(text);
-            }
-          }}
-          onEnd={onEditEnd}
-        />
-      );
-    }
+    const contentRef = ref<HTMLElement>();
+    const showCSSTooltip = ref(false);
 
-    const { suffix, ellipsisStr, showTooltip, tooltipProps, TooltipComponent } =
-      ellipsisConfig;
-    const showEllipsis = isEllipsis && !expanded;
-    const Content = Wrap(props, showEllipsis ? ellipsisText : children);
-    const titleAttrs = showEllipsis && !showTooltip ? { title: fullText } : {};
+    const calTooltip = () => {
+      if (wrapperRef.value && contentRef.value) {
+        const _show =
+          contentRef.value.offsetHeight > wrapperRef.value.offsetHeight;
+        if (_show !== showCSSTooltip.value) {
+          showCSSTooltip.value = _show;
+          emit('ellipsis', _show);
+        }
+      }
+    };
 
-    return (
-      <ResizeObserver onResize={onResize}>
-        <Component class={classNames} ref="wrapperRef" {...titleAttrs}>
-          {showEllipsis && showTooltip ? (
+    const ellipsisStyle = computed(() => {
+      if (expanded.value) {
+        return {};
+      }
+
+      return {
+        'overflow': 'hidden',
+        'text-overflow': 'ellipsis',
+        'display': '-webkit-box',
+        '-webkit-line-clamp': ellipsisConfig.value.rows,
+        '-webkit-box-orient': 'vertical',
+      };
+    });
+
+    return () => {
+      children = slots.default?.() || [];
+
+      // 编辑中
+      if (mergeEditing.value) {
+        const _editText = editText.value ?? fullText.value;
+
+        return (
+          <EditContent
+            text={_editText}
+            onChange={(text: string) => {
+              if (text !== _editText) {
+                onEditChange(text);
+              }
+            }}
+            onEnd={onEditEnd}
+          />
+        );
+      }
+
+      const {
+        suffix,
+        ellipsisStr,
+        showTooltip,
+        tooltipProps,
+        TooltipComponent,
+      } = ellipsisConfig.value;
+      const showEllipsis = isEllipsis.value && !expanded.value;
+
+      const titleAttrs =
+        showEllipsis && !showTooltip ? { title: fullText.value } : {};
+      const Component = component.value;
+
+      if (ellipsisConfig.value.css) {
+        const Content = Wrap(props, children);
+        const Outer = (
+          <Component
+            class={classNames.value}
+            ref={wrapperRef}
+            style={ellipsisStyle.value}
+            {...titleAttrs}
+            {...attrs}
+          >
+            <span ref={contentRef}>{Content}</span>
+          </Component>
+        );
+
+        if (showCSSTooltip.value) {
+          return (
             <TooltipComponent
               {...tooltipProps}
+              onResize={() => calTooltip()}
               v-slots={{
-                content: () => fullText,
-                default: () => [<span>{Content}</span>],
+                content: () => fullText.value,
               }}
-            />
-          ) : (
-            Content
-          )}
-          {showEllipsis ? ellipsisStr : null}
-          {suffix}
-          {renderOperations()}
-        </Component>
-      </ResizeObserver>
-    );
+            >
+              {Outer}
+            </TooltipComponent>
+          );
+        }
+
+        return (
+          <ResizeObserver
+            onResize={() => {
+              calTooltip();
+            }}
+          >
+            {Outer}
+          </ResizeObserver>
+        );
+      }
+
+      const Content = Wrap(props, showEllipsis ? ellipsisText.value : children);
+
+      return (
+        <ResizeObserver onResize={() => resizeOnNextFrame()}>
+          <Component
+            class={classNames.value}
+            ref={wrapperRef}
+            {...titleAttrs}
+            {...attrs}
+          >
+            {showEllipsis && showTooltip ? (
+              <TooltipComponent
+                {...tooltipProps}
+                v-slots={{
+                  content: () => fullText.value,
+                }}
+              >
+                <span>{Content}</span>
+              </TooltipComponent>
+            ) : (
+              Content
+            )}
+            {showEllipsis ? ellipsisStr : null}
+            {suffix}
+            {renderOperations()}
+          </Component>
+        </ResizeObserver>
+      );
+    };
   },
 });

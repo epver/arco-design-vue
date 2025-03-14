@@ -6,10 +6,9 @@ import _ListItem from './list-item';
 import _ListItemMeta from './list-item-meta.vue';
 
 const List = Object.assign(_List, {
-  Item: {
-    ..._ListItem,
+  Item: Object.assign(_ListItem, {
     Meta: _ListItemMeta,
-  },
+  }),
   install: (app: App, options?: ArcoOptions) => {
     setGlobalConfig(app, options);
     const componentPrefix = getComponentPrefix(options);
@@ -23,5 +22,7 @@ const List = Object.assign(_List, {
 export type ListInstance = InstanceType<typeof _List>;
 export type ListItemInstance = InstanceType<typeof _ListItem>;
 export type ListItemMetaInstance = InstanceType<typeof _ListItemMeta>;
+
+export { _ListItem as ListItem, _ListItemMeta as ListItemMeta };
 
 export default List;

@@ -3,7 +3,7 @@
 meta:
   type: 组件
   category: 其他
-title: 分割分割 Split
+title: 面板分割 Split
 description: 将面板分割成两部分。
 ```
 ---
@@ -20,5 +20,7 @@ description: Divide the panel into two parts.
 @import ./__demo__/basic.md
 
 @import ./__demo__/nested.md
+
+## API
 
 %%API(split.vue)%%

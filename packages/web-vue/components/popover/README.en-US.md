@@ -14,6 +14,10 @@ description: When the mouse hovers, focus, or click on a component, a bubble-lik
 
 @import ./__demo__/position.md
 
+`<popover>` 组件继承 `<trigger>` 组件的全部属性
+
+## API
+
 
 ### `<popover>` Props
 
@@ -29,7 +33,7 @@ description: When the mouse hovers, focus, or click on a component, a bubble-lik
 |content-style|The style of the popup content|`CSSProperties`|`-`|
 |arrow-class|The class name of the popup arrow|`ClassName`|`-`|
 |arrow-style|The style of the popup arrow|`CSSProperties`|`-`|
-|popup-container|Mount container for pop-up box|`string \| HTMLElement \| null \| undefined`|`-`|
+|popup-container|Mount container for pop-up box|`string \| HTMLElement`|`-`|
 ### `<popover>` Events
 
 |Event Name|Description|Parameters|

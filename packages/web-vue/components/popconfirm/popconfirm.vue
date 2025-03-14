@@ -11,6 +11,8 @@
     :content-style="contentStyle"
     :arrow-class="arrowCls"
     :arrow-style="arrowStyle"
+    animation-name="zoom-in-fade-out"
+    auto-fit-transform-origin
     @popup-visible-change="handlePopupVisibleChange"
   >
     <slot />
@@ -29,10 +31,20 @@
         </span>
       </div>
       <div :class="`${prefixCls}-footer`">
-        <arco-button @click="handleCancel">
+        <arco-button
+          size="mini"
+          v-bind="cancelButtonProps"
+          @click="handleCancel"
+        >
           {{ cancelText || t('popconfirm.cancelText') }}
         </arco-button>
-        <arco-button type="primary" @click="handleOk">
+        <arco-button
+          type="primary"
+          size="mini"
+          v-bind="okButtonProps"
+          :loading="mergedOkLoading"
+          @click="handleOk"
+        >
           {{ okText || t('popconfirm.okText') }}
         </arco-button>
       </div>
@@ -44,20 +56,16 @@
 import type { PropType } from 'vue';
 import { computed, CSSProperties, defineComponent, ref } from 'vue';
 import { getPrefixCls } from '../_utils/global-config';
-import {
-  MESSAGE_TYPES,
-  MessageType,
-  TRIGGER_POSITIONS,
-  TriggerPosition,
-} from '../_utils/constant';
+import type { MessageType, TriggerPosition } from '../_utils/constant';
 import IconInfoCircleFill from '../icon/icon-info-circle-fill';
 import IconCheckCircleFill from '../icon/icon-check-circle-fill';
 import IconExclamationCircleFill from '../icon/icon-exclamation-circle-fill';
 import IconCloseCircleFill from '../icon/icon-close-circle-fill';
-import ArcoButton from '../button';
+import ArcoButton, { ButtonProps } from '../button';
 import Trigger from '../trigger';
 import { useI18n } from '../locale';
 import { ClassName } from '../_utils/types';
+import { isBoolean, isFunction, isPromise } from '../_utils/is';
 
 export default defineComponent({
   name: 'Popconfirm',
@@ -71,11 +79,6 @@ export default defineComponent({
   },
   props: {
     /**
-     * @zh 标题
-     * @en Title
-     */
-    title: String,
-    /**
      * @zh 内容
      * @en Content
      */
@@ -88,9 +91,6 @@ export default defineComponent({
     position: {
       type: String as PropType<TriggerPosition>,
       default: 'top',
-      validator: (value: any) => {
-        return TRIGGER_POSITIONS.includes(value);
-      },
     },
     /**
      * @zh 气泡确认框是否可见
@@ -117,9 +117,6 @@ export default defineComponent({
     type: {
       type: String as PropType<MessageType>,
       default: 'info',
-      validator: (value: any) => {
-        return MESSAGE_TYPES.includes(value);
-      },
     },
     /**
      * @zh 确认按钮的内容
@@ -144,14 +141,14 @@ export default defineComponent({
      * @en Props of ok button
      */
     okButtonProps: {
-      type: Object,
+      type: Object as PropType<ButtonProps>,
     },
     /**
      * @zh 取消按钮的Props
      * @en Props of cancel button
      */
     cancelButtonProps: {
-      type: Object,
+      type: Object as PropType<ButtonProps>,
     },
     /**
      * @zh 弹出框内容的类名
@@ -186,29 +183,46 @@ export default defineComponent({
      * @en Mount container for popup
      */
     popupContainer: {
-      type: [String, Object] as PropType<
-        string | HTMLElement | null | undefined
+      type: [String, Object] as PropType<string | HTMLElement>,
+    },
+    /**
+     * @zh 触发 ok 事件前的回调函数。如果返回 false 则不会触发后续事件，也可使用 done 进行异步关闭。
+     * @en The callback function before the ok event is triggered. If false is returned, subsequent events will not be triggered, and done can also be used to close asynchronously.
+     */
+    onBeforeOk: {
+      type: Function as PropType<
+        (
+          done: (closed: boolean) => void
+        ) => void | boolean | Promise<void | boolean>
       >,
     },
+    /**
+     * @zh 触发 cancel 事件前的回调函数。如果返回 false 则不会触发后续事件。
+     * @en The callback function before the cancel event is triggered. If it returns false, no subsequent events will be triggered.
+     */
+    onBeforeCancel: {
+      type: Function as PropType<() => boolean>,
+    },
   },
-  emits: [
-    'update:popupVisible',
+  emits: {
+    'update:popupVisible': (visible: boolean) => true,
     /**
      * @zh 气泡确认框的显隐状态改变时触发
      * @en Triggered when the visible or hidden state of the bubble confirmation box changes
+     * @param {boolean} visible
      */
-    'popupVisibleChange',
+    'popupVisibleChange': (visible: boolean) => true,
     /**
      * @zh 点击确认按钮时触发
      * @en Triggered when the confirm button is clicked
      */
-    'ok',
+    'ok': () => true,
     /**
      * @zh 点击取消按钮时触发
      * @en Triggered when the cancel button is clicked
      */
-    'cancel',
-  ],
+    'cancel': () => true,
+  },
   /**
    * @zh 内容
    * @en Content
@@ -227,27 +241,79 @@ export default defineComponent({
     const computedPopupVisible = computed(
       () => props.popupVisible ?? _popupVisible.value
     );
+    const _okLoading = ref(false);
+    const mergedOkLoading = computed(() => props.okLoading || _okLoading.value);
+
+    // Used to ignore closed Promises
+    let promiseNumber = 0;
 
     const close = () => {
+      promiseNumber++;
+      if (_okLoading.value) {
+        _okLoading.value = false;
+      }
       _popupVisible.value = false;
       emit('update:popupVisible', false);
       emit('popupVisibleChange', false);
     };
 
     const handlePopupVisibleChange = (visible: boolean) => {
-      _popupVisible.value = visible;
-      emit('update:popupVisible', visible);
-      emit('popupVisibleChange', visible);
+      if (!visible) {
+        close();
+      } else {
+        _popupVisible.value = visible;
+        emit('update:popupVisible', visible);
+        emit('popupVisibleChange', visible);
+      }
     };
 
-    const handleOk = () => {
-      emit('ok');
-      close();
+    const handleOk = async () => {
+      const currentPromiseNumber = promiseNumber;
+      const closed = await new Promise<boolean>(
+        // eslint-disable-next-line no-async-promise-executor
+        async (resolve) => {
+          if (isFunction(props.onBeforeOk)) {
+            let result = props.onBeforeOk((closed = true) => resolve(closed));
+            if (isPromise(result) || !isBoolean(result)) {
+              _okLoading.value = true;
+            }
+            if (isPromise(result)) {
+              try {
+                // if onBeforeOk is Promise<void> ,set Defaults true
+                result = (await result) ?? true;
+              } catch (error) {
+                result = false;
+                throw error;
+              }
+            }
+            if (isBoolean(result)) {
+              resolve(result);
+            }
+          } else {
+            resolve(true);
+          }
+        }
+      );
+
+      if (currentPromiseNumber === promiseNumber) {
+        if (closed) {
+          emit('ok');
+          close();
+        } else if (_okLoading.value) {
+          _okLoading.value = false;
+        }
+      }
     };
 
     const handleCancel = () => {
-      emit('cancel');
-      close();
+      let result = true;
+      if (isFunction(props.onBeforeCancel)) {
+        result = props.onBeforeCancel() ?? false;
+      }
+      if (result) {
+        emit('cancel');
+        close();
+      }
     };
 
     const contentCls = computed(() => [
@@ -262,9 +328,10 @@ export default defineComponent({
 
     return {
       prefixCls,
-      computedPopupVisible,
       contentCls,
       arrowCls,
+      computedPopupVisible,
+      mergedOkLoading,
       handlePopupVisibleChange,
       handleOk,
       handleCancel,

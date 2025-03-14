@@ -7,17 +7,22 @@
 
 .@{cascader-prefix-cls} {
   &-panel {
-    top: 4px;
+    display: inline-flex;
     box-sizing: border-box;
-    width: 100%;
     height: @select-popup-max-height;
     overflow: hidden;
     white-space: nowrap;
     list-style: none;
-    background-color: var(--color-bg-popup);
+    background-color: var(~'@{arco-cssvars-prefix}-color-bg-popup');
     border: 1px solid @select-popup-color-border;
     border-radius: @select-popup-border-radius;
     box-shadow: @select-popup-box-shadow;
+  }
+
+  &-search-panel {
+    justify-content: flex-start;
+    width: 100%;
+    overflow: auto;
   }
 
   &-popup-trigger-hover {
@@ -26,27 +31,34 @@
     }
   }
 
-  &-popup &-popup-inner {
-  }
-
   &-highlight {
     font-weight: @font-weight-500;
   }
 
   &-panel-column {
     position: relative;
-    display: inline-block;
+    display: inline-flex;
+    flex-direction: column;
+    min-width: 120px;
     height: 100%;
     max-height: 200px;
-    overflow-y: auto;
-    white-space: nowrap;
-    vertical-align: top;
-    background-color: var(--color-bg-popup);
-    overflow-y: auto;
+    background-color: var(~'@{arco-cssvars-prefix}-color-bg-popup');
+
+    &-loading {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
 
     &:not(:last-of-type) {
       border-right: 1px solid @select-popup-color-border;
     }
+  }
+
+  &-column-content {
+    flex: 1;
+    max-height: 200px;
+    overflow-y: auto;
   }
 
   &-list-wrapper {
@@ -65,6 +77,7 @@
   &-list-empty {
     display: flex;
     align-items: center;
+    width: 100%;
     height: 100%;
   }
 
@@ -73,18 +86,19 @@
     box-sizing: border-box;
     margin: 0;
     padding: 0;
-    overflow-y: auto;
     list-style: none;
 
-    &-multiple {
-      .@{cascader-prefix-cls}-list-option-label {
+    &-multiple,
+    &-strictly {
+      .@{cascader-prefix-cls}-option-label {
         padding-left: 0;
       }
 
-      .@{cascader-prefix-cls}-list-option {
+      .@{cascader-prefix-cls}-option {
         padding-left: @cascader-padding-item-left;
 
-        .@{prefix}-checkbox {
+        .@{prefix}-checkbox,
+        .@{prefix}-radio {
           margin-right: @cascader-margin-checkbox-right;
           padding-left: 0;
         }
@@ -93,7 +107,7 @@
   }
 
   &-search-list&-list-multiple {
-    .@{cascader-prefix-cls}-list-option-label {
+    .@{cascader-prefix-cls}-option-label {
       padding-right: @cascader-padding-item-left;
     }
   }
@@ -159,6 +173,11 @@
       .@{prefix}-checkbox-icon-hover::before {
       background-color: @cascader-color-checkbox-bg_hover;
     }
+
+    .@{prefix}-radio:not(.@{prefix}-radio-disabled):not(.@{prefix}-radio-checked):hover
+      .@{prefix}-radio-icon-hover::before {
+      background-color: @cascader-color-checkbox-bg_hover;
+    }
   }
 
   &-option,
@@ -166,7 +185,7 @@
     &-disabled,
     &-disabled:hover {
       color: @cascader-color-item-text_disabled;
-      background-color: @color-transparent;
+      background-color: @cascader-color-item-bg_disabled;
       cursor: not-allowed;
 
       .@{prefix}-icon-right {
@@ -174,7 +193,7 @@
       }
 
       .@{prefix}-icon-check {
-        color: var(--color-primary-light-3);
+        color: var(~'@{arco-cssvars-prefix}-color-primary-light-3');
       }
     }
   }
@@ -182,13 +201,11 @@
   &-option {
     &-active {
       color: @cascader-color-item-text_active;
-      font-weight: @cascader-font-item-weight_active;
       background-color: @cascader-color-item-bg_active;
       transition: all @transition-duration-2 @transition-timing-function-linear;
 
       &:hover {
         color: @cascader-color-item-text_active;
-        font-weight: @cascader-font-item-weight_active;
         background-color: @cascader-color-item-bg_active;
       }
     }
@@ -196,13 +213,22 @@
     &-active&-disabled,
     &-active&-disabled:hover {
       color: @cascader-color-item-text_disabled_active;
-      font-weight: @cascader-font-item-weight_active;
       background-color: @cascader-color-item-bg_disabled_active;
     }
   }
 }
 
-.cascaderSlide-enter-active,
-.cascaderSlide-appear-active {
+.cascader-slide-enter-active,
+.cascader-slide-leave-active {
   transition: margin @transition-duration-3 @transition-timing-function-standard;
+}
+
+.cascader-slide-enter-from,
+.cascader-slide-leave-to {
+  margin-left: -120px;
+}
+
+.cascader-slide-enter-to,
+.cascader-slide-leave-from {
+  margin-left: 0;
 }

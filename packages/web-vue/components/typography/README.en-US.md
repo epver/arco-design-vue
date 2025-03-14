@@ -20,6 +20,8 @@ description: Used to display titles, paragraphs, and text content.
 
 @import ./__demo__/ellipsis.md
 
+## API
+
 
 
 
@@ -27,32 +29,35 @@ description: Used to display titles, paragraphs, and text content.
 
 ### `Common` Props
 
-|Attribute|Description|Type|Default|
-|---|---|---|:---:|
-|type|Text type|`'primary' \| 'secondary' \| 'success' \| 'danger' \| 'warning'`|`-`|
-|bold|Whether enable bold style|`boolean`|`false`|
-|mark|Mark style|`boolean \| { color: string }`|`false`|
-|underline|Whether enable underline style|`boolean`|`false`|
-|delete|Whether enable delete style|`boolean`|`false`|
-|code|Whether enable code style|`boolean`|`false`|
-|disabled|Whether disabled|`boolean`|`false`|
-|editable|Whether it's editable|`boolean`|`false`|
-|editing **(v-model)**|Whether it's editing|`boolean`|`-`|
-|default-editing|Default editing state|`boolean`|`false`|
-|edit-text **(v-model)**|Edit text|`string`|`-`|
-|copyable|Whether turn on copy functionality|`boolean`|`false`|
-|copy-text|Copied text|`string`|`-`|
-|ellipsis|Automatic overflow omission, refer to [EllipsisConfig](#ellipsisconfig) for more information.|`boolean \| EllipsisConfig`|`false`|
+|Attribute|Description|Type|Default|version|
+|---|---|---|:---:|:---|
+|type|Text type|`'primary' \| 'secondary' \| 'success' \| 'danger' \| 'warning'`|`-`||
+|bold|Whether enable bold style|`boolean`|`false`||
+|mark|Mark style|`boolean \| { color: string }`|`false`||
+|underline|Whether enable underline style|`boolean`|`false`||
+|delete|Whether enable delete style|`boolean`|`false`||
+|code|Whether enable code style|`boolean`|`false`||
+|disabled|Whether disabled|`boolean`|`false`||
+|editable|Whether it's editable|`boolean`|`false`||
+|editing **(v-model)**|Whether it's editing|`boolean`|`-`||
+|default-editing|Default editing state|`boolean`|`false`||
+|edit-text **(v-model)**|Edit text|`string`|`-`||
+|copyable|Whether turn on copy functionality|`boolean`|`false`||
+|copy-text|Copied text|`string`|`-`||
+|copy-delay|After the copy is successful, the delay time for the copy button to return to the clickable state, in milliseconds|`number`|`3000`|2.16.0|
+|ellipsis|Automatic overflow omission, refer to [EllipsisConfig](#EllipsisConfig) for more information.|`boolean \| EllipsisConfig`|`false`||
+|edit-tooltip-props|Edit button question prompt configuration|`object`|`-`|2.32.0|
+|copy-tooltip-props|Copy button question prompt configuration|`object`|`-`|2.32.0|
 ### `Common` Events
 
 |Event Name|Description|Parameters|
 |---|---|---|
 |edit-start|Edit start|-|
-|change|Edit content change|-|
-|edit-end|Edit end|text: `string`Edited text|
-|copy|Copy|text: `string`Copied text|
-|ellipsis|Ellipsis change|isEllipsis: `boolean`Ellipsis state|
-|expand|Expand collapse event|expanded: `boolean`Expand state|
+|change|Edit content change|text: `string`|
+|edit-end|Edit end|-|
+|copy|Copy|text: `string`|
+|ellipsis|Ellipsis change|isEllipsis: `boolean`|
+|expand|Expand collapse event|expanded: `boolean`|
 ### `Common` Slots
 
 |Slot Name|Description|Parameters|
@@ -89,12 +94,13 @@ description: Used to display titles, paragraphs, and text content.
 
 ### EllipsisConfig
 
-|Name|Description|Type|Default|
-|---|---|---|:---:|
-|rows|The number of omitted lines|`number`|`1`|
-|expandable|Whether expandable|`boolean`|`false`|
-|ellipsisStr|Ellipsis string|`string`|`'...'`|
-|suffix|Suffix|`string`|`-`|
-|showTooltip|Pop-up box when configuration is omitted|`boolean    \| { type: 'tooltip' \| 'popover'; props: Record<string, any> }`|`false`|
+|Name|Description|Type|Default|version|
+|---|---|---|:---:|:---|
+|rows|The number of omitted lines|`number`|`1`||
+|expandable|Whether expandable|`boolean`|`false`||
+|ellipsisStr|Ellipsis string|`string`|`'...'`||
+|suffix|Suffix|`string`|`-`||
+|showTooltip|Pop-up box when configuration is omitted|`boolean    \| { type: 'tooltip' \| 'popover'; props: Record<string, any> }`|`false`||
+|css|Whether to use CSS ellipsis (expansion, custom ellipsis and suffix are not supported in this mode)|`boolean`|`false`|2.37.0|
 
 

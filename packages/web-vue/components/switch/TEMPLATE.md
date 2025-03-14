@@ -25,10 +25,18 @@ description: Mutually exclusive operation controls, users can turn on or turn of
 
 @import ./__demo__/disabled.md
 
+@import ./__demo__/color.md
+
+@import ./__demo__/value.md
+
+@import ./__demo__/change-intercept.md
+
 @import ./__demo__/loading.md
 
 @import ./__demo__/text.md
 
 @import ./__demo__/icon.md
+
+## API
 
 %%API(switch.vue)%%

@@ -17,6 +17,8 @@ const Button = Object.assign(_Button, {
 
 export type ButtonInstance = InstanceType<typeof _Button>;
 export type ButtonGroupInstance = InstanceType<typeof _ButtonGroup>;
-export type ButtonProps = ButtonInstance['$props'];
+export type { ButtonProps } from './interface';
+
+export { _ButtonGroup as ButtonGroup };
 
 export default Button;

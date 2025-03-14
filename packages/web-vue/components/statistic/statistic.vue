@@ -6,27 +6,30 @@
       </slot>
     </div>
     <div :class="`${prefixCls}-content`">
-      <div :class="`${prefixCls}-value`">
-        <span v-if="$slots.prefix" :class="`${prefixCls}-prefix`">
-          <slot name="prefix" />
-        </span>
-        <template v-if="formatValue.isNumber">
-          <span :class="`${prefixCls}-value-integer`">
-            {{ formatValue.integer }}
-          </span>
-          <span
-            v-if="formatValue.decimal"
-            :class="`${prefixCls}-value-decimal`"
-          >
-            .{{ formatValue.decimal }}
-          </span>
-        </template>
+      <div :class="`${prefixCls}-value`" :style="valueStyle">
+        <span v-if="showPlaceholder">{{ placeholder }}</span>
         <template v-else>
-          {{ formatValue.value }}
+          <span v-if="$slots.prefix" :class="`${prefixCls}-prefix`">
+            <slot name="prefix" />
+          </span>
+          <template v-if="formatValue.isNumber">
+            <span :class="`${prefixCls}-value-integer`">
+              {{ formatValue.integer }}
+            </span>
+            <span
+              v-if="formatValue.decimal"
+              :class="`${prefixCls}-value-decimal`"
+            >
+              .{{ formatValue.decimal }}
+            </span>
+          </template>
+          <template v-else>
+            {{ formatValue.value }}
+          </template>
+          <span v-if="$slots.suffix" :class="`${prefixCls}-suffix`">
+            <slot name="suffix" />
+          </span>
         </template>
-        <span v-if="$slots.suffix" :class="`${prefixCls}-suffix`">
-          <slot name="suffix" />
-        </span>
       </div>
       <div v-if="extra || $slots.extra" :class="`${prefixCls}-extra`">
         <slot name="extra">
@@ -38,13 +41,22 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, onMounted, ref, watch } from 'vue';
+import {
+  computed,
+  CSSProperties,
+  defineComponent,
+  onMounted,
+  PropType,
+  ref,
+  toRefs,
+  watch,
+} from 'vue';
 import dayjs from 'dayjs';
 // @ts-ignore
 import BTween from 'b-tween';
 import NP from 'number-precision';
 import { getPrefixCls } from '../_utils/global-config';
-import { isNumber } from '../_utils/is';
+import { isNumber, isUndefined } from '../_utils/is';
 import { Data } from '../_utils/types';
 
 export default defineComponent({
@@ -59,10 +71,12 @@ export default defineComponent({
      * @zh 数值显示的值
      * @en Numerical display value
      */
-    value: [Number, Object],
+    value: {
+      type: [Number, Object] as PropType<number | Date>,
+    },
     /**
-     * @zh 数值显示的格式（日期模式使用）
-     * @en Format of numerical display (used in date mode)
+     * @zh 数值显示的格式 [dayjs](https://day.js.org/docs/en/display/format)（日期模式使用）
+     * @en Format of numerical display [dayjs](https://day.js.org/docs/en/display/format) (used in date mode)
      */
     format: {
       type: String,
@@ -85,7 +99,10 @@ export default defineComponent({
      * @zh 小数保留位数（数字模式使用）
      * @en Decimal reserved digits (used in digital mode)
      */
-    precision: Number,
+    precision: {
+      type: Number,
+      default: 0,
+    },
     /**
      * @zh 进位分隔符（数字模式使用）
      * @en Carry separator (used in number mode)
@@ -123,6 +140,22 @@ export default defineComponent({
       type: Number,
       default: undefined,
     },
+    /**
+     * @zh 提示文字（当 value 为 undefined 时显示）
+     * @en Prompt text (displayed when value is undefined )
+     * @version 2.28.0
+     */
+    placeholder: {
+      type: String,
+    },
+    /**
+     * @zh 自定义显示值的样式
+     * @en Custom value style
+     * @version 2.32.0
+     */
+    valueStyle: {
+      type: Object as PropType<CSSProperties>,
+    },
   },
   /**
    * @zh 标题
@@ -146,12 +179,21 @@ export default defineComponent({
    */
   setup(props) {
     const prefixCls = getPrefixCls('statistic');
+    const numberValue = computed(() => {
+      if (isNumber(props.value)) {
+        return props.value;
+      }
+      return 0;
+    });
     const innerValue = ref(props.valueFrom ?? props.value);
     const tween = ref(null);
+    const { value } = toRefs(props);
+
+    const showPlaceholder = computed(() => isUndefined(props.value));
 
     const animation = (
       from: number = props.valueFrom ?? 0,
-      to: number = props.value
+      to: number = numberValue.value
     ) => {
       if (from !== to) {
         tween.value = new BTween({
@@ -170,14 +212,14 @@ export default defineComponent({
             innerValue.value = to;
           },
         });
-        tween.value.start();
+        (tween.value as any)?.start();
       }
     };
 
     const formatValue = computed(() => {
-      let _value = innerValue.value;
+      let _value: string | number | Date | undefined = innerValue.value;
       if (isNumber(_value)) {
-        if (props.precision) {
+        if (isNumber(props.precision)) {
           _value = NP.round(_value, props.precision).toFixed(props.precision);
         }
         const splitValue = String(_value).split('.');
@@ -209,16 +251,27 @@ export default defineComponent({
     watch(
       () => props.start,
       (value) => {
-        if (value && !tween.value) {
+        if (value && props.animation && !tween.value) {
           animation();
         }
       }
     );
 
+    watch(value, (value) => {
+      if (tween.value) {
+        (tween.value as any)?.stop();
+        tween.value = null;
+      }
+      innerValue.value = value;
+      if (props.animation && props.start) {
+        animation();
+      }
+    });
+
     return {
       prefixCls,
+      showPlaceholder,
       formatValue,
-      innerValue,
     };
   },
 });

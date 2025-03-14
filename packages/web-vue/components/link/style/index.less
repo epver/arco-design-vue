@@ -3,11 +3,13 @@
 @link-prefix-cls: ~'@{prefix}-link';
 
 .@{link-prefix-cls} {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   padding: @link-padding-vertical @link-padding-horizontal;
   color: @link-color-text;
   font-size: @link-font-size;
-  line-height: @line-height-base;
+  line-height: @link-line-height;
   text-decoration: none;
   background-color: @color-transparent;
   border-radius: @link-border-radius;
@@ -25,10 +27,27 @@
     transition: none;
   }
 
+  &&-hoverless {
+    display: inline;
+    padding: 0;
+    background-color: unset;
+
+    &:active,
+    &:hover {
+      background-color: unset;
+    }
+  }
+
   &&-disabled {
     color: @link-color-text_disabled;
     background: none;
     cursor: not-allowed;
+  }
+
+  &&-loading {
+    color: @link-color-text_loading;
+    background: none;
+    cursor: default;
   }
 
   // 不同状态
@@ -48,6 +67,10 @@
     color: @link-color-text_success_disabled;
   }
 
+  &-status-success&-loading {
+    color: @link-color-text_success_loading;
+  }
+
   &-status-danger {
     color: @link-color-text_error;
 
@@ -64,6 +87,10 @@
     color: @link-color-text_error_disabled;
   }
 
+  &-status-danger&-loading {
+    color: @link-color-text_error_loading;
+  }
+
   &-status-warning {
     color: @link-color-text_warning;
 
@@ -78,6 +105,10 @@
 
   &-status-warning&-disabled {
     color: @link-color-text_warning_disabled;
+  }
+
+  &-status-warning&-loading {
+    color: @link-color-text_warning_loading;
   }
 
   // 链接图标

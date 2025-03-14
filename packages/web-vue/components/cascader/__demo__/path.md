@@ -18,89 +18,80 @@ title:
 
 ```vue
 <template>
-  <a-space>
-    <a-cascader :options="options" :style="{width:'320px'}" @change="change"  placeholder="Please select ..." path-mode />
-    <a-cascader :options="options" :default-value="[['beijing','chaoyang','datunli']]" :style="{width:'320px'}"
-                @change="change" placeholder="Please select ..." path-mode
-    />
+  <a-space direction="vertical" size="large">
+    <a-cascader :options="options" :style="{width:'320px'}" placeholder="Please select ..." path-mode
+                @change="handleChange" />
+    <a-cascader :options="options"
+                :default-value="[['beijing','chaoyang','datunli']]"
+                :style="{width:'320px'}"
+                placeholder="Please select ..."
+                path-mode
+                @change="handleChange" />
   </a-space>
 </template>
 
 <script>
 export default {
-  methods:{
-    change(path){
+  setup() {
+    const handleChange = (path) => {
       console.log(path)
     }
-  },
-  data() {
+
+    const options = [
+      {
+        value: 'beijing',
+        label: 'Beijing',
+        children: [
+          {
+            value: 'chaoyang',
+            label: 'ChaoYang',
+            children: [
+              {
+                value: 'datunli',
+                label: 'Datunli',
+              },
+            ],
+          },
+          {
+            value: 'haidian',
+            label: 'Haidian',
+          },
+          {
+            value: 'dongcheng',
+            label: 'Dongcheng',
+          },
+          {
+            value: 'xicheng',
+            label: 'Xicheng',
+            children: [
+              {
+                value: 'jinrongjie',
+                label: 'Jinrongjie',
+              },
+              {
+                value: 'tianqiao',
+                label: 'Tianqiao',
+              },
+            ],
+          },
+        ],
+      },
+      {
+        value: 'shanghai',
+        label: 'Shanghai',
+        children: [
+          {
+            value: 'huangpu',
+            label: 'Huangpu',
+          },
+        ],
+      },
+    ];
     return {
-      options: [
-        {
-          value: 'beijing',
-          label: 'Beijing',
-          children: [
-            {
-              value: 'chaoyang',
-              label: 'ChaoYang',
-              children: [
-                {
-                  value: 'datunli',
-                  label: 'Datunli',
-                },
-              ],
-            },
-            {
-              value: 'haidian',
-              label: 'Haidian',
-              children: [
-                {
-                  value: 'datunli',
-                  label: 'Datunli',
-                },
-              ],
-            },
-            {
-              value: 'dongcheng',
-              label: 'Dongcheng',
-              children: [
-                {
-                  value: 'datunli',
-                  label: 'Datunli',
-                },
-              ],
-            },
-            {
-              value: 'xicheng',
-              label: 'XiCheng',
-              children: [
-                {
-                  value: 'datunli',
-                  label: 'Datunli',
-                },
-              ],
-            },
-          ],
-        },
-        {
-          value: 'shanghai',
-          label: 'Shanghai',
-          children: [
-            {
-              value: 'shanghaishi',
-              label: 'Shanghai',
-              children: [
-                {
-                  value: 'huangpu',
-                  label: 'Huangpu',
-                },
-              ],
-            },
-          ],
-        },
-      ]
+      options,
+      handleChange
     }
-  }
+  },
 }
 </script>
 ```

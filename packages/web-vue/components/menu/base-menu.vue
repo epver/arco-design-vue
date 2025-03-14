@@ -23,20 +23,22 @@ import {
   PropType,
   provide,
   reactive,
-  ref,
   toRefs,
-  watchEffect,
+  StyleValue,
 } from 'vue';
 import { getPrefixCls } from '../_utils/global-config';
 import IconMenuFold from '../icon/icon-menu-fold';
 import IconMenuUnfold from '../icon/icon-menu-unfold';
 import useMergeState from '../_hooks/use-merge-state';
-import useIsMounted from '../_hooks/use-is-mounted';
 import { provideLevel } from './hooks/use-level';
-import { MenuContext, MenuInjectionKey } from './context';
-import { MenuProps } from './interface';
+import { MenuInjectionKey } from './context';
 import usePickSlots from '../_hooks/use-pick-slots';
 import { omit } from '../_utils/omit';
+import useMenuDataCollector from './hooks/use-menu-data-collector';
+import useMenuOpenState from './hooks/use-menu-open-state';
+import { useResponsive } from '../_hooks/use-responsive';
+import { isNumber, isObject } from '../_utils/is';
+import { TriggerProps } from '../trigger';
 
 /**
  * @displayName Menu
@@ -50,7 +52,7 @@ export default defineComponent({
   inheritAttrs: false,
   props: {
     style: {
-      type: Object as PropType<CSSProperties>,
+      type: Object as PropType<StyleValue>,
     },
     /**
      * @zh 菜单的主题
@@ -85,6 +87,7 @@ export default defineComponent({
     /**
      * @zh 是否折叠菜单
      * @en Whether to collapse the menu
+     * @vModel
      */
     collapsed: {
       type: Boolean,
@@ -128,6 +131,7 @@ export default defineComponent({
     /**
      * @zh 选中的菜单项 key 数组
      * @en The selected menu item key array
+     * @vModel
      */
     selectedKeys: {
       type: Array as PropType<string[]>,
@@ -143,6 +147,7 @@ export default defineComponent({
     /**
      * @zh 展开的子菜单 key 数组
      * @en Expanded submenu key array
+     * @vModel
      */
     openKeys: {
       type: Array as PropType<string[]>,
@@ -167,7 +172,7 @@ export default defineComponent({
      * @en Accept all `Props` of `Trigger` in pop-up mode
      */
     triggerProps: {
-      type: Object,
+      type: Object as PropType<TriggerProps>,
     },
     /**
      * @zh 弹出模式下可接受所有 `ToolTip` 的 `Props`
@@ -175,6 +180,31 @@ export default defineComponent({
      */
     tooltipProps: {
       type: Object,
+    },
+    /**
+     * @zh 默认展开选中的菜单
+     * @en Expand the selected menus by default
+     * @version 2.8.0
+     */
+    autoOpenSelected: {
+      type: Boolean,
+    },
+    /**
+     * @zh 响应式的断点, 详见[响应式栅格](/vue/component/grid)
+     * @en Responsive breakpoints, see [Responsive Grid](/vue/component/grid) for details
+     * @version 2.18.0
+     */
+    breakpoint: {
+      type: String as PropType<'xxl' | 'xl' | 'lg' | 'md' | 'sm' | 'xs'>,
+    },
+    /**
+     * @zh 弹出框的最大高度
+     * @en The maximum height of popover
+     * @version 2.23.0
+     */
+    popupMaxHeight: {
+      type: [Boolean, Number] as PropType<boolean | number>,
+      default: true,
     },
     // internal
     prefixCls: {
@@ -186,6 +216,9 @@ export default defineComponent({
     siderCollapsed: {
       type: Boolean,
     },
+    isRoot: {
+      type: Boolean,
+    },
   },
   emits: [
     'update:collapsed',
@@ -195,6 +228,7 @@ export default defineComponent({
      * @zh 折叠状态改变时触发
      * @en Triggered when the collapsed state changes
      * @param {boolean} collapsed
+     * @param {'clickTrigger'|'responsive'} type
      */
     'collapse',
     /**
@@ -227,7 +261,7 @@ export default defineComponent({
    * @en Icon expand right
    * @slot expand-icon-right
    */
-  setup(props: MenuProps, { emit, slots }) {
+  setup(props, { emit, slots }) {
     const {
       style,
       mode,
@@ -245,15 +279,21 @@ export default defineComponent({
       defaultSelectedKeys,
       openKeys: propOpenKeys,
       defaultOpenKeys,
-      prefixCls,
       triggerProps,
       tooltipProps,
+      autoOpenSelected,
+      breakpoint,
+      popupMaxHeight,
       // internal
+      prefixCls,
       inTrigger,
       siderCollapsed,
+      isRoot,
     } = toRefs(props);
 
-    const isMounted = useIsMounted();
+    const { subMenuKeys, menuData } = useMenuDataCollector({
+      type: isRoot.value ? 'menu' : 'popupMenu',
+    });
 
     const [selectedKeys, setSelectedKeys] = useMergeState(
       defaultSelectedKeys.value,
@@ -262,10 +302,16 @@ export default defineComponent({
       })
     );
 
-    const [openKeys, setOpenKeys] = useMergeState(
-      defaultOpenKeys.value,
+    const { openKeys, setOpenKeys, open } = useMenuOpenState(
       reactive({
-        value: propOpenKeys,
+        modelValue: propOpenKeys,
+        defaultValue: defaultOpenKeys,
+        autoOpen,
+        autoOpenSelected,
+        selectedKeys,
+        subMenuKeys,
+        menuData,
+        accordion,
       })
     );
 
@@ -285,19 +331,28 @@ export default defineComponent({
         !inTrigger.value &&
         showCollapseButton.value
     );
-    const onCollapseBtnClick = () => {
-      const nextCollapsed = !collapsed.value;
-      setCollapsed(nextCollapsed);
-      emit('update:collapsed', nextCollapsed);
-      emit('collapse', nextCollapsed);
+    const changeCollapsed = (
+      newVal: boolean,
+      type: 'clickTrigger' | 'responsive'
+    ) => {
+      if (newVal === collapsed.value) return;
+      setCollapsed(newVal);
+      emit('update:collapsed', newVal);
+      emit('collapse', newVal, type);
     };
+    const onCollapseBtnClick = () => {
+      changeCollapsed(!collapsed.value, 'clickTrigger');
+    };
+    useResponsive(breakpoint, (checked) => {
+      changeCollapsed(!checked, 'responsive');
+    });
 
     const computedPrefixCls = computed(
       () => prefixCls?.value || getPrefixCls('menu')
     );
     const classNames = computed(() => [
       computedPrefixCls.value,
-      `${computedPrefixCls.value}-${theme.value}`,
+      `${computedPrefixCls.value}-${theme?.value}`,
       {
         [`${computedPrefixCls.value}-horizontal`]: mode.value === 'horizontal',
         [`${computedPrefixCls.value}-vertical`]: mode.value !== 'horizontal',
@@ -308,54 +363,23 @@ export default defineComponent({
       },
     ]);
     const computedStyle = computed(() => {
-      const pxCollapsedWidth =
-        collapsedWidth &&
-        collapsedWidth.value !== undefined &&
-        `${collapsedWidth.value}px`;
+      const pxCollapsedWidth = isNumber(collapsedWidth.value)
+        ? `${collapsedWidth.value}px`
+        : undefined;
+
+      const objectStyle = isObject(style.value)
+        ? (style.value as CSSProperties)
+        : undefined;
 
       const width = computedCollapsed.value
         ? pxCollapsedWidth
-        : style?.value?.width;
+        : objectStyle?.width;
 
-      const widthStyle = width ? { width } : {};
-
-      return {
-        ...omit(style?.value || {}, ['width']),
-        ...widthStyle,
-      };
+      return [
+        objectStyle ? omit(objectStyle, ['width']) : style.value,
+        { width },
+      ];
     });
-
-    // Used for autoOpen to set openKeys
-    const subMenuKeys = ref<string[]>([]);
-    let prevSubMenuKeys: string[] = [];
-    let shadowOpenKeys: string[] = [];
-    watchEffect(() => {
-      shadowOpenKeys = [...openKeys.value];
-    });
-
-    // 初次渲染以及子菜单变化时需要响应 autoOpen
-    watchEffect(
-      () => {
-        if (!isMounted.value) return;
-
-        let validOpenKeys = shadowOpenKeys.filter(
-          (i) => subMenuKeys.value.indexOf(i) > -1
-        );
-        if (autoOpen.value) {
-          const keysAdded = subMenuKeys.value.filter(
-            (i) => prevSubMenuKeys.indexOf(i) < 0
-          );
-          validOpenKeys = (shadowOpenKeys || []).concat(keysAdded);
-        }
-        prevSubMenuKeys = subMenuKeys.value.slice();
-        setOpenKeys(
-          accordion.value ? validOpenKeys.slice(0, 1) : validOpenKeys
-        );
-      },
-      {
-        flush: 'post',
-      }
-    );
 
     const expandIconDown = usePickSlots(slots, 'expand-icon-down');
     const expandIconRight = usePickSlots(slots, 'expand-icon-right');
@@ -374,6 +398,7 @@ export default defineComponent({
       collapsed: computedCollapsed,
       triggerProps,
       tooltipProps,
+      popupMaxHeight,
       expandIconDown,
       expandIconRight,
       onMenuItemClick: (key: string) => {
@@ -382,30 +407,13 @@ export default defineComponent({
         emit('menu-item-click', key);
       },
       onSubMenuClick: (key: string, level: number) => {
-        let newOpenKeys: string[] = [];
-        if (openKeys.value && openKeys.value.indexOf(key) > -1) {
-          if (accordion.value && level === 1) {
-            newOpenKeys = [];
-          } else {
-            newOpenKeys = openKeys.value.filter((i) => i !== key) || [];
-          }
-        } else if (accordion.value && level === 1) {
-          newOpenKeys = [key];
-        } else {
-          newOpenKeys = openKeys.value.concat([key]) || [];
-        }
+        const newOpenKeys = open(key, level);
         setOpenKeys(newOpenKeys);
         emit('update:openKeys', newOpenKeys);
         emit('sub-menu-click', key, newOpenKeys);
       },
-      collectSubMenuKey: (key: string) => {
-        subMenuKeys.value.push(key);
-      },
-      removeSubMenuKey: (key: string) => {
-        subMenuKeys.value = subMenuKeys.value.filter((i) => i !== key);
-      },
     });
-    provide<MenuContext>(MenuInjectionKey, menuContext);
+    provide(MenuInjectionKey, menuContext);
 
     // provide LevelContext
     provideLevel(1);

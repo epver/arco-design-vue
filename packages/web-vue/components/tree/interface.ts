@@ -1,13 +1,15 @@
-/* eslint-disable no-use-before-define */
 import { Slot, VNode } from 'vue';
-import { VirtualListProps } from '../_components/virtual-list/interface';
+import { VirtualListProps } from '../_components/virtual-list-v2/interface';
+import { Size } from '../_utils/constant';
+
+export type TreeNodeKey = number | string;
 
 export interface TreeNodeData {
   /**
    * @zh 唯一标示
    * @en Unique key
    * */
-  key?: string;
+  key?: string | number;
   /**
    * @zh 该节点显示的标题
    * @en The title of the node
@@ -47,22 +49,22 @@ export interface TreeNodeData {
    * @zh 节点的图标
    * @en Node icon
    * */
-  icon?: () => VNode[];
+  icon?: () => VNode;
   /**
    * @zh 定制 switcher 图标，优先级大于 tree
    * @en Custom switcher icon, priority is greater than tree
    * */
-  switcherIcon?: () => VNode[];
+  switcherIcon?: () => VNode;
   /**
    * @zh 定制 loading 图标，优先级大于 tree
    * @en Customize loading icon, priority is greater than tree
    * */
-  loadingIcon?: () => VNode[];
+  loadingIcon?: () => VNode;
   /**
    * @zh 定制 drag 图标，优先级大于 tree
    * @en Custom drag icon, priority is greater than tree
    * */
-  dragIcon?: () => VNode[];
+  dragIcon?: () => VNode;
   /**
    * @zh 子节点
    * @en Child node
@@ -85,90 +87,142 @@ export interface TreeNodeProps extends Omit<TreeNodeData, 'children'> {
 }
 
 export interface Node extends TreeNodeProps {
-  key: string;
+  key: TreeNodeKey;
   treeNodeProps: TreeNodeProps;
   treeNodeData: TreeNodeData;
   parent?: Node;
-  parentKey?: string;
-  pathParentKeys: string[];
+  parentKey?: TreeNodeKey;
+  pathParentKeys: TreeNodeKey[];
   children?: Node[];
 }
 
 export type FilterTreeNode = (node: TreeNodeData) => boolean;
 
-export interface FieldNames {
+export interface TreeFieldNames {
   /**
-   * @zh 指定 key 在 TreeNodeData 中对应的字段
+   * @zh 指定 key 在 TreeNodeData 中的字段名
+   * @en Specify the field name of key in TreeNodeData
+   * @defaultValue key
    */
   key?: string;
   /**
-   * @zh 指定 title 在 TreeNodeData 中对应的字段
+   * @zh 指定 title 在 TreeNodeData 中的字段名
+   * @en Specify the field name of title in TreeNodeData
+   * @defaultValue title
    */
   title?: string;
   /**
-   * 是否禁用
+   * @zh 指定 disabled 在 TreeNodeData 中的字段名
+   * @en Specify the field name of disabled in TreeNodeData
+   * @defaultValue disabled
    */
   disabled?: string;
-
+  /**
+   * @zh 指定 children 在 TreeNodeData 中的字段名
+   * @en Specify the field name of children in TreeNodeData
+   * @defaultValue children
+   */
   children?: string;
+  /**
+   * @zh 指定 isLeaf 在 TreeNodeData 中的字段名
+   * @en Specify the field name of isLeaf in TreeNodeData
+   * @defaultValue isLeaf
+   */
   isLeaf?: string;
+  /**
+   * @zh 指定 disableCheckbox 在 TreeNodeData 中的字段名
+   * @en Specify the field name of disableCheckbox in TreeNodeData
+   * @defaultValue disableCheckbox
+   */
   disableCheckbox?: string;
+  /**
+   * @zh 指定 checkable 在 TreeNodeData 中的字段名
+   * @en Specify the field name of checkable in TreeNodeData
+   * @defaultValue checkable
+   */
   checkable?: string;
+  /**
+   * @zh 指定 icon 在 TreeNodeData 中的字段名
+   * @en Specify the field name of icon in TreeNodeData
+   * @defaultValue checkable
+   */
+  icon?: string;
 }
 
 export type LoadMore = (node: TreeNodeData) => Promise<void>;
 export type DropPosition = -1 | 0 | 1;
+export type CheckedStrategy = 'all' | 'parent' | 'child';
+export type CheckableType =
+  | boolean
+  | ((
+      node: TreeNodeData,
+      info: {
+        level: number;
+        isLeaf: boolean;
+      }
+    ) => boolean);
+export type SelectableType = CheckableType;
 
 export interface TreeProps {
-  size: 'mini' | 'small' | 'medium' | 'large';
+  size: Size;
   blockNode: boolean;
   defaultExpandAll: boolean;
   multiple: boolean;
-  checkable: boolean;
+  checkable: CheckableType;
   draggable: boolean;
   allowDrop?: (options: {
     dropNode: TreeNodeData;
     dropPosition: DropPosition;
   }) => boolean;
-  selectable: boolean;
+  selectable: SelectableType;
   checkStrictly: boolean;
-  checkedStrategy: 'all' | 'parent' | 'child';
-  defaultSelectedKeys?: string[];
-  selectedKeys?: string[];
-  defaultCheckedKeys?: string[];
-  checkedKeys?: string[];
-  defaultExpandedKeys?: string[];
-  expandedKeys?: string[];
+  checkedStrategy: CheckedStrategy;
+  defaultSelectedKeys?: TreeNodeKey[];
+  selectedKeys?: TreeNodeKey[];
+  defaultCheckedKeys?: TreeNodeKey[];
+  checkedKeys?: TreeNodeKey[];
+  halfCheckedKeys: TreeNodeKey[] | undefined;
+  defaultExpandedKeys?: TreeNodeKey[];
+  expandedKeys?: TreeNodeKey[];
   data: TreeNodeData[];
-  fieldNames?: FieldNames;
+  fieldNames?: TreeFieldNames;
   virtualListProps?: VirtualListProps;
   showLine: boolean;
   loadMore?: LoadMore;
+  defaultExpandSelected?: boolean;
+  defaultExpandChecked?: boolean;
+  autoExpandParent?: boolean;
+  onlyCheckLeaf: boolean;
+  animation: boolean;
+  actionOnNodeClick?: 'expand';
+  disableSelectActionOnly: boolean;
   dragIcon?: Slot;
   switcherIcon?: Slot;
   loadingIcon?: Slot;
   extra?: Slot;
   title?: Slot;
   onSelect?: (
-    selectedKeys: string[],
+    selectedKeys: TreeNodeKey[],
     event: {
-      selected: boolean;
+      selected?: boolean;
       selectedNodes: TreeNodeData[];
-      node: TreeNodeData;
-      e: Event;
+      node?: TreeNodeData;
+      e?: Event;
     }
   ) => void;
   onCheck?: (
-    checkedKeys: string[],
+    checkedKeys: TreeNodeKey[],
     event: {
-      checked: boolean;
+      checked?: boolean;
       checkedNodes: TreeNodeData[];
-      node: TreeNodeData;
-      e: Event;
+      node?: TreeNodeData;
+      halfCheckedKeys: TreeNodeKey[];
+      halfCheckedNodes: TreeNodeData[];
+      e?: Event;
     }
   ) => void;
   onExpand?: (
-    expandedKeys: string[],
+    expandedKeys: TreeNodeKey[],
     event: {
       expanded: boolean;
       expandedNodes: TreeNodeData[];
@@ -188,3 +242,5 @@ export interface TreeProps {
   }) => void;
   filterTreeNode?: (node: TreeNodeData) => boolean;
 }
+
+export type Key2TreeNode = Map<TreeNodeKey, Node>;

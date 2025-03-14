@@ -4,7 +4,9 @@
       ref="refImg"
       :class="`${prefixCls}-img`"
       v-bind="imgProps"
+      :style="{ ...imgStyle, ...fitStyle }"
       :title="title"
+      :alt="alt"
       @load="onImgLoaded"
       @error="onImgLoadError"
       @click="onImgClick"
@@ -13,9 +15,13 @@
       <slot v-if="isError" name="error">
         <div :class="`${prefixCls}-error`">
           <div :class="`${prefixCls}-error-icon`">
-            <IconImageClose />
+            <slot name="error-icon">
+              <IconImageClose />
+            </slot>
           </div>
-          <div :class="`${prefixCls}-error-alt`">{{ alt || description }}</div>
+          <div v-if="alt || description" :class="`${prefixCls}-error-alt`">
+            {{ alt || description }}
+          </div>
         </div>
       </slot>
       <slot v-if="isLoading && (showLoader || $slots.loader)" name="loader">
@@ -30,7 +36,8 @@
       </slot>
     </div>
     <ImageFooter
-      v-if="isLoaded && showFooter"
+      v-if="showFooter"
+      :class="footerClass"
       :prefix-cls="prefixCls"
       :title="title"
       :description="description"
@@ -46,7 +53,11 @@
       :visible="mergedPreviewVisible"
       :render-to-body="renderToBody"
       @close="onPreviewClose"
-    />
+    >
+      <template #actions>
+        <slot name="preview-actions" />
+      </template>
+    </ImagePreview>
   </div>
 </template>
 <script lang="ts">
@@ -59,8 +70,10 @@ import {
   ref,
   reactive,
   inject,
+  StyleValue,
+  CSSProperties,
 } from 'vue';
-import type { ImageProps, ImagePreviewProps } from './interface';
+import type { ImagePreviewProps } from './interface';
 import IconImageClose from '../icon/icon-image-close';
 import IconLoading from '../icon/icon-loading';
 import ImageFooter from './image-footer.vue';
@@ -73,6 +86,7 @@ import { omit } from '../_utils/omit';
 import useMergeState from '../_hooks/use-merge-state';
 import { PreviewGroupInjectionKey } from './context';
 import { useI18n } from '../locale';
+import { isBoolean } from '../_utils/is';
 
 let uuid = 0;
 
@@ -126,6 +140,15 @@ export default defineComponent({
       type: String,
     },
     /**
+     * @zh 确定图片如何适应容器框
+     * @en indicate how the image should be resized to fit its container
+     */
+    fit: {
+      type: String as PropType<
+        'contain' | 'cover' | 'fill' | 'none' | 'scale-down'
+      >,
+    },
+    /**
      * @zh 图片的文字描述
      * @en Text description of the image
      */
@@ -133,11 +156,12 @@ export default defineComponent({
       type: String,
     },
     /**
-     * @zh 是否隐藏 footer
-     * @en Whether to hide footer
+     * @zh 是否隐藏 footer（2.36.0 版本支持 'never' 参数，支持在加载错误时显示底部内容）
+     * @en Whether to hide footer (Version 2.36.0 supports the 'never' parameter, which supports displaying bottom content when loading errors)
      */
     hideFooter: {
-      type: Boolean,
+      type: [Boolean, String] as PropType<boolean | 'never'>,
+      default: false,
     },
     /**
      * @zh 底部显示的位置
@@ -181,11 +205,19 @@ export default defineComponent({
       default: false,
     },
     /**
-     * @zh 预览的配置项（所有选项都是可选的） [ImagePreviewProps](#imagepreview)
-     * @en Preview configuration items (all options are optional) [ImagePreviewProps](#imagepreview)
+     * @zh 预览的配置项（所有选项都是可选的） [ImagePreviewProps](#image-preview%20Props)
+     * @en Preview configuration items (all options are optional) [ImagePreviewProps](#image-preview%20Props)
      */
     previewProps: {
       type: Object as PropType<ImagePreviewProps>,
+    },
+    /**
+     * @zh 底部显示区域的类名
+     * @en The class name of the bottom display area
+     * @version 2.23.0
+     */
+    footerClass: {
+      type: [String, Array, Object],
     },
   },
   emits: [
@@ -197,7 +229,27 @@ export default defineComponent({
     'preview-visible-change',
     'update:previewVisible',
   ],
-  setup(props: ImageProps, { attrs, slots, emit }) {
+  /**
+   * @zh 自定义错误状态的图标
+   * @en Customize the icon of error content.
+   * @slot error-icon
+   */
+  /**
+   * @zh 自定义错误状态内容
+   * @en Customize error content.
+   * @slot error
+   */
+  /**
+   * @zh 自定义加载状态效果
+   * @en Customize loading effect.
+   * @slot loader
+   */
+  /**
+   * @zh 底部额外内容
+   * @en Extra content at the bottom
+   * @slot extra
+   */
+  setup(props, { attrs, slots, emit }) {
     const { t } = useI18n();
     const {
       height,
@@ -210,6 +262,7 @@ export default defineComponent({
       defaultPreviewVisible,
       previewVisible,
       preview,
+      previewProps,
     } = toRefs(props);
 
     const groupContext = inject(PreviewGroupInjectionKey, undefined);
@@ -221,14 +274,22 @@ export default defineComponent({
     const { isLoaded, isError, isLoading, setLoadStatus } = useImageLoadState();
 
     const sizeStyle = computed(() => ({
-      height: normalizeImageSizeProp(height?.value),
       width: normalizeImageSizeProp(width?.value),
+      height: normalizeImageSizeProp(height?.value),
     }));
+
+    const fitStyle = computed<CSSProperties>(() => {
+      if (props.fit) {
+        return { objectFit: props.fit };
+      }
+      return {};
+    });
 
     const wrapperClassNames = computed(() => [
       `${prefixCls}`,
       {
         [`${prefixCls}-loading`]: isLoading.value,
+        [`${prefixCls}-loading-error`]: isError.value,
         [`${prefixCls}-with-footer-inner`]:
           isLoaded && showFooter && footerPosition.value === 'inner',
         [`${prefixCls}-with-footer-outer`]:
@@ -237,13 +298,19 @@ export default defineComponent({
       attrs.class,
     ]);
 
-    const wrapperStyles = computed(() => [sizeStyle.value, attrs.style]);
+    const wrapperStyles = computed<StyleValue[]>(() => [
+      sizeStyle.value,
+      attrs.style as StyleValue,
+    ]);
 
-    const showFooter = computed(
-      () =>
-        !hideFooter.value &&
-        !!(title?.value || description?.value || slots.extra)
-    );
+    const showFooter = computed(() => {
+      if (!(title?.value || description?.value || slots.extra)) {
+        return false;
+      }
+      if (isBoolean(hideFooter.value))
+        return !hideFooter.value && isLoaded.value;
+      return hideFooter.value === 'never';
+    });
 
     const imgProps = computed(() => omit(attrs, ['class', 'style']));
 
@@ -268,7 +335,7 @@ export default defineComponent({
     watchEffect((onInvalidate) => {
       const unRegister = groupContext?.registerImageUrl?.(
         imageId,
-        src?.value || '',
+        (previewProps?.value?.src ?? src?.value) || '',
         preview.value
       );
       onInvalidate(() => {
@@ -307,6 +374,7 @@ export default defineComponent({
       wrapperStyles,
       showFooter,
       imgProps,
+      imgStyle: sizeStyle,
       isLoaded,
       isError,
       isLoading,
@@ -316,6 +384,7 @@ export default defineComponent({
       onImgLoadError,
       onImgClick,
       onPreviewClose,
+      fitStyle,
     };
   },
 });

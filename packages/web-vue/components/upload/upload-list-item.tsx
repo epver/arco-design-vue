@@ -39,11 +39,13 @@ export default defineComponent({
         type = props.file.file.type;
       } else {
         const extension = props.file.name?.split('.')[1] ?? '';
-        if (['png', 'jpg', 'jpeg', 'bmp', 'gif'].includes(extension)) {
+        if (['png', 'jpg', 'jpeg', 'bmp', 'gif', 'webp'].includes(extension)) {
           type = 'image';
-        } else if (['mp4', 'm2v', 'mkv'].includes(extension)) {
+        } else if (['mp4', 'm2v', 'mkv', 'm4v', 'mov'].includes(extension)) {
           type = 'video';
-        } else if (['mp3', 'wav', 'wmv'].includes(extension)) {
+        } else if (
+          ['mp3', 'wav', 'wmv', 'm4a', 'acc', 'flac'].includes(extension)
+        ) {
           type = 'audio';
         }
       }
@@ -64,46 +66,84 @@ export default defineComponent({
     };
 
     return () => (
-      <li class={[itemCls, `${itemCls}-${props.file.status}`]}>
-        <span class={`${itemCls}-content`}>
+      <div class={[itemCls, `${itemCls}-${props.file.status}`]}>
+        <div class={`${itemCls}-content`}>
           {uploadCtx?.listType === 'picture' && (
             <span class={`${itemCls}-thumbnail`}>
-              <img src={props.file.url} />
+              {uploadCtx?.slots.image?.({ fileItem: props.file }) ?? (
+                <img
+                  src={props.file.url}
+                  alt={props.file.name}
+                  {...(uploadCtx?.imageLoading
+                    ? { loading: uploadCtx.imageLoading }
+                    : undefined)}
+                />
+              )}
             </span>
           )}
-          {uploadCtx?.listType === 'text' && (
-            <span class={`${itemCls}-file-icon`}>
-              {uploadCtx?.customIcon?.fileIcon?.() || renderFileIcon()}
-            </span>
-          )}
-          <span class={`${itemCls}-name`}>
-            {uploadCtx?.customIcon?.fileName?.(props.file) || props.file.url ? (
-              <a class={`${itemCls}-name-link`} href={props.file.url}>
-                {props.file.name}
+          <div class={`${itemCls}-name`}>
+            {uploadCtx?.listType === 'text' && (
+              <span class={`${itemCls}-file-icon`}>
+                {uploadCtx?.slots['file-icon']?.({ fileItem: props.file }) ??
+                  uploadCtx?.customIcon?.fileIcon?.(props.file) ??
+                  renderFileIcon()}
+              </span>
+            )}
+            {uploadCtx?.showLink && props.file.url ? (
+              <a
+                class={`${itemCls}-name-link`}
+                target="_blank"
+                href={props.file.url}
+                {...(uploadCtx?.download
+                  ? { download: props.file.name }
+                  : undefined)}
+              >
+                {uploadCtx?.slots['file-name']?.({ fileItem: props.file }) ??
+                  uploadCtx?.customIcon?.fileName?.(props.file) ??
+                  props.file.name}
               </a>
             ) : (
-              <span class={`${itemCls}-name-text`}>{props.file.name}</span>
-            )}
-          </span>
-          {props.file.status === 'error' && (
-            <Tooltip content={t('upload.error')}>
-              <span class={[uploadCtx?.iconCls, `${uploadCtx?.iconCls}-error`]}>
-                {uploadCtx?.customIcon?.errorIcon?.() || (
-                  <IconExclamationCircleFill />
-                )}
+              <span
+                class={`${itemCls}-name-text`}
+                onClick={() => uploadCtx?.onPreview(props.file)}
+              >
+                {uploadCtx?.slots['file-name']?.({ fileItem: props.file }) ??
+                  uploadCtx?.customIcon?.fileName?.(props.file) ??
+                  props.file.name}
               </span>
-            </Tooltip>
-          )}
+            )}
+            {props.file.status === 'error' && (
+              <Tooltip content={t('upload.error')}>
+                <span
+                  class={[uploadCtx?.iconCls, `${uploadCtx?.iconCls}-error`]}
+                >
+                  {uploadCtx?.slots['error-icon']?.() ??
+                    uploadCtx?.customIcon?.errorIcon?.() ?? (
+                      <IconExclamationCircleFill />
+                    )}
+                </span>
+              </Tooltip>
+            )}
+          </div>
           <UploadProgress file={props.file} listType={props.listType} />
-        </span>
-        <span class={`${itemCls}-operation`}>
-          <IconHover onClick={() => uploadCtx?.onRemove?.(props.file)}>
-            <span class={[uploadCtx?.iconCls, `${uploadCtx?.iconCls}-remove`]}>
-              {uploadCtx?.customIcon?.removeIcon?.() || <IconDelete />}
-            </span>
-          </IconHover>
-        </span>
-      </li>
+        </div>
+        {uploadCtx?.showRemoveButton && (
+          <span class={`${itemCls}-operation`}>
+            <IconHover
+              // @ts-ignore
+              onClick={() => uploadCtx?.onRemove?.(props.file)}
+            >
+              <span
+                class={[uploadCtx?.iconCls, `${uploadCtx?.iconCls}-remove`]}
+              >
+                {uploadCtx?.slots['remove-icon']?.() ??
+                  uploadCtx?.customIcon?.removeIcon?.() ?? <IconDelete />}
+              </span>
+            </IconHover>
+          </span>
+        )}
+        {uploadCtx?.slots['extra-button']?.({ fileItem: props.file })}
+      </div>
     );
   },
 });

@@ -1,10 +1,8 @@
 import type { InjectionKey } from 'vue';
 
 export interface TriggerContext {
-  onMouseenter: () => void;
-  onMouseleave: () => void;
-  onFocusin: () => void;
-  onFocusout: () => void;
+  onMouseenter: (ev: MouseEvent) => void;
+  onMouseleave: (ev: MouseEvent) => void;
   addChildRef: (ref: any) => void;
   removeChildRef: (ref: any) => void;
 }

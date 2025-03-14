@@ -1,9 +1,12 @@
-import type { InjectionKey } from 'vue';
+import type { InjectionKey, Slots } from 'vue';
 
 export interface CollapseContext {
-  activeKeys: string[];
+  activeKeys: (string | number)[];
+  slots: Slots;
+  showExpandIcon?: boolean;
   expandIconPosition: string;
-  handleClick: (key: string, e: MouseEvent) => void;
+  destroyOnHide: boolean;
+  handleClick: (key: string | number, e: MouseEvent) => void;
 }
 
 export const collapseKey: InjectionKey<CollapseContext> = Symbol('collapseCtx');

@@ -18,12 +18,41 @@ description: The basic layout framework of the page is often used nested with co
 
 @import ./__demo__/resize.md
 
+## API
+
 
 ### `<layout>` Props
 
 |Attribute|Description|Type|Default|
 |---|---|---|:---:|
 |has-sider|Indicates that there is a Sider in the sub-element, which generally does not need to be specified. Used to avoid style flicker when rendering on the server side.|`boolean`|`false`|
+
+
+
+
+### `<layout-header>` Slots
+
+|Slot Name|Description|Parameters|
+|---|---|---|
+|default|Content|-|
+
+
+
+
+### `<layout-content>` Slots
+
+|Slot Name|Description|Parameters|
+|---|---|---|
+|default|Content|-|
+
+
+
+
+### `<layout-footer>` Slots
+
+|Slot Name|Description|Parameters|
+|---|---|---|
+|default|Content|-|
 
 
 

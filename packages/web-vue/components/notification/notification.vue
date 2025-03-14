@@ -1,13 +1,14 @@
 <template>
   <li
+    role="alert"
     :class="[
       prefixCls,
       `${prefixCls}-${type}`,
       { [`${prefixCls}-closable`]: closable },
     ]"
   >
-    <div :class="`${prefixCls}-left`">
-      <div v-if="showIcon" :class="`${prefixCls}-icon`">
+    <div v-if="showIcon" :class="`${prefixCls}-left`">
+      <div :class="`${prefixCls}-icon`">
         <slot name="icon">
           <icon-info-circle-fill v-if="type === 'info'" />
           <icon-check-circle-fill v-else-if="type === 'success'" />
@@ -17,17 +18,24 @@
       </div>
     </div>
     <div :class="`${prefixCls}-right`">
-      <div :class="`${prefixCls}-title`">
+      <div v-if="$slots.default" :class="`${prefixCls}-title`">
         <slot />
       </div>
-      <div :class="`${prefixCls}-content`">
+      <div v-if="$slots.content" :class="`${prefixCls}-content`">
         <slot name="content" />
+      </div>
+      <div v-if="$slots.footer" :class="`${prefixCls}-footer`">
+        <slot name="footer" />
       </div>
     </div>
     <div v-if="closable" :class="`${prefixCls}-close-btn`" @click="handleClose">
-      <a-icon-hover>
-        <icon-close />
-      </a-icon-hover>
+      <slot name="closeIconElement">
+        <a-icon-hover>
+          <slot name="closeIcon">
+            <icon-close />
+          </slot>
+        </a-icon-hover>
+      </slot>
     </div>
   </li>
 </template>

@@ -23,6 +23,12 @@
     margin-bottom: @form-inline-margin-item-bottom;
   }
 
+  &-auto-label-width &-item-label-col {
+    > .@{form-item-label-prefix-cls} {
+      white-space: nowrap;
+    }
+  }
+
   &-item {
     display: flex;
     align-items: flex-start;
@@ -34,11 +40,11 @@
       display: block;
 
       > .@{form-item-prefix-cls}-label-col {
+        justify-content: flex-start;
         margin-bottom: @form-vertical-margin-label-bottom;
         padding: 0;
         line-height: @line-height-base;
         white-space: normal;
-        text-align: left;
       }
     }
 
@@ -50,7 +56,8 @@
       padding-right: @form-margin-label-right;
     }
 
-    &&-error {
+    &&-error,
+    &&-has-help {
       margin-bottom: 0;
     }
   }
@@ -64,7 +71,7 @@
   &-size-mini &-item-label-col {
     line-height: @size-mini;
 
-    > label {
+    > .@{form-item-label-prefix-cls} {
       font-size: @form-size-mini-font-label-size;
     }
   }
@@ -80,7 +87,7 @@
   &-size-small &-item-label-col {
     line-height: @size-small;
 
-    > label {
+    > .@{form-item-label-prefix-cls} {
       font-size: @form-size-small-font-label-size;
     }
   }
@@ -96,7 +103,7 @@
   &-size-large &-item-label-col {
     line-height: @size-large;
 
-    > label {
+    > .@{form-item-label-prefix-cls} {
       font-size: @form-size-large-font-label-size;
     }
   }
@@ -109,7 +116,7 @@
     min-height: @size-large;
   }
 
-  &-extra {
+  &-item-extra {
     margin-top: @form-margin-extra-top;
     color: @form-color-extra-text;
     font-size: @form-font-extra-text-size;
@@ -125,26 +132,32 @@
       color: @form-color-extra-text;
     }
 
-    + .@{form-prefix-cls}-extra {
+    + .@{form-prefix-cls}-item-extra {
       margin-top: 0;
       margin-bottom: @form-margin-extra-bottom;
     }
   }
 
   &-item-label-col {
+    display: flex;
     flex-shrink: 0;
+    justify-content: flex-end;
     line-height: @size-default;
     white-space: nowrap;
-    text-align: right;
 
     &-left {
-      text-align: left;
+      justify-content: flex-start;
     }
 
-    > label {
+    > .@{form-item-label-prefix-cls} {
+      max-width: 100%;
       color: @form-color-text-label;
       font-size: @form-size-default-font-label-size;
       white-space: normal;
+    }
+
+    &&-flex {
+      box-sizing: content-box;
     }
 
     // 用处不明
@@ -162,15 +175,27 @@
     flex-direction: column;
     align-items: flex-start;
     width: 100%;
+    min-width: 0;
     min-height: @size-default;
   }
 
   &-item-content {
-    display: flex;
-    align-items: center;
-    justify-content: flex-start;
-    width: 100%;
-    min-height: 32px;
+    flex: 1;
+    max-width: 100%;
+    min-height: @size-default;
+
+    &-wrapper {
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      width: 100%;
+    }
+
+    &-flex {
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+    }
   }
 
   /** slider display: block **/
@@ -187,8 +212,14 @@
     line-height: 1;
 
     svg {
+      display: inline-block;
       transform: scale(0.5);
     }
+  }
+
+  &-tooltip {
+    margin-left: @form-margin-tooltip-left;
+    color: @form-color-text-tooltip;
   }
 }
 

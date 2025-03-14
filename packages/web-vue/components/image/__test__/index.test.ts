@@ -116,7 +116,7 @@ describe('Image', () => {
     await rotateRightAction.trigger('click');
     expect(
       wrapper.find('.arco-image-preview-img').attributes('style')
-    ).toContain('rotate(270deg)');
+    ).toContain('rotate(90deg)');
   });
 
   test('Preview rotate left should work', async () => {
@@ -127,7 +127,7 @@ describe('Image', () => {
     await rotateLeftAction.trigger('click');
     expect(
       wrapper.find('.arco-image-preview-img').attributes('style')
-    ).toContain('rotate(90deg)');
+    ).toContain('rotate(270deg)');
   });
 
   test('Preview zoom in should work', async () => {
@@ -163,10 +163,10 @@ describe('Image', () => {
     });
     const rightIcon = wrapper.find('.arco-image-preview-arrow-right');
     await rightIcon.trigger('click');
-    expect(wrapper.emitted('change')![0]).toContain(2);
+    expect(wrapper.emitted('change')![0]).toContain(1);
     const leftIcon = wrapper.find('.arco-image-preview-arrow-left');
     await leftIcon.trigger('click');
-    expect(wrapper.emitted('change')![1]).toContain(1);
+    expect(wrapper.emitted('change')![1]).toContain(0);
   });
 
   // Utils getScale

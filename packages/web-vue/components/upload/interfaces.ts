@@ -1,11 +1,8 @@
-import type { VNode } from 'vue';
-import { Data } from '../_utils/types';
+import type { RenderFunction, VNode } from 'vue';
 
-export const LIST_TYPES = ['text', 'picture', 'picture-card'] as const;
-export type ListType = typeof LIST_TYPES[number];
+export type ListType = 'text' | 'picture' | 'picture-card';
 
-export const FILE_STATUS = ['init', 'uploading', 'done', 'error'] as const;
-export type FileStatus = typeof FILE_STATUS[number];
+export type FileStatus = 'init' | 'uploading' | 'done' | 'error';
 
 export interface FileItem {
   /**
@@ -34,26 +31,65 @@ export interface FileItem {
    */
   response?: any;
   /**
-   * @zh 图片地址
-   * @en The image address
+   * @zh 文件地址
+   * @en The file address
    */
   url?: string;
   /**
-   * @zh 图片文件名
-   * @en Picture file name
+   * @zh 文件名
+   * @en The file name
    */
   name?: string;
 }
 
 export interface CustomIcon {
-  previewIcon?: () => VNode;
-  removeIcon?: () => VNode;
-  fileIcon?: () => VNode;
-  retryIcon?: () => VNode;
-  cancelIcon?: () => VNode;
-  startIcon?: () => VNode;
-  errorIcon?: () => VNode;
-  successIcon?: () => VNode;
+  /**
+   * @zh 开始图标
+   * @en Start icon
+   */
+  startIcon?: RenderFunction;
+  /**
+   * @zh 取消图标
+   * @en Cancel icon
+   */
+  cancelIcon?: RenderFunction;
+  /**
+   * @zh 重试图标
+   * @en Retry icon
+   */
+  retryIcon?: RenderFunction;
+
+  /**
+   * @zh 成功图标
+   * @en Success icon
+   */
+  successIcon?: RenderFunction;
+  /**
+   * @zh 失败图标
+   * @en Error icon
+   */
+  errorIcon?: RenderFunction;
+  /**
+   * @zh 移除图标
+   * @en Remove icon
+   */
+  removeIcon?: RenderFunction;
+  /**
+   * @zh 预览图标
+   * @en Preview icon
+   */
+  previewIcon?: RenderFunction;
+  /**
+   * @zh 文件图标
+   * @en File icon
+   * @param {FileItem} fileItem
+   */
+  fileIcon?: (fileItem: FileItem) => VNode;
+  /**
+   * @zh 文件名
+   * @en File name
+   * @param {FileItem} fileItem
+   */
   fileName?: (fileItem: FileItem) => string | VNode;
 }
 
@@ -67,7 +103,7 @@ export interface RequestOption {
    * @zh 请求报文的头信息
    * @en Header information of the request message
    * */
-  headers?: Data;
+  headers?: Record<string, string>;
   /**
    * @zh 上传文件的文件名
    * @en File name of the uploaded file
@@ -82,7 +118,9 @@ export interface RequestOption {
    * @zh 附加的请求信息
    * @en Additional requested information
    * */
-  data?: Data | ((fileItem: FileItem) => Data);
+  data?:
+    | Record<string, string | Blob>
+    | ((fileItem: FileItem) => Record<string, string | Blob>);
   /**
    * @zh 是否携带cookie信息
    * @en Whether to carry cookie information
@@ -105,7 +143,7 @@ export interface RequestOption {
   onError: (response?: any) => void;
 }
 
-export interface UploadRequest extends Data {
+export interface UploadRequest extends Record<string, unknown> {
   /**
    * @zh 终止上传
    * @en Terminate upload

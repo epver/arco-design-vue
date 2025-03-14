@@ -1,12 +1,19 @@
-import { computed, defineComponent, inject, PropType } from 'vue';
-import { TableData, TableOperationColumn } from './interface';
+import { computed, defineComponent, inject, PropType, VNode } from 'vue';
+import { TableDataWithRaw, TableOperationColumn } from './interface';
 import { getPrefixCls } from '../_utils/global-config';
-import { getOperationFixedCls, getOperationStyle } from './utils';
+import {
+  getLeafKeys,
+  getOperationFixedCls,
+  getOperationStyle,
+  getSelectionStatus,
+} from './utils';
 import Checkbox from '../checkbox';
 import Radio from '../radio';
 import IconPlus from '../icon/icon-plus';
 import IconMinus from '../icon/icon-minus';
+import IconDragDotVertical from '../icon/icon-drag-dot-vertical';
 import { TableContext, tableInjectionKey } from './context';
+import { BaseType } from '../_utils/types';
 
 export default defineComponent({
   name: 'OperationTd',
@@ -17,10 +24,6 @@ export default defineComponent({
     IconMinus,
   },
   props: {
-    record: {
-      type: Object as PropType<TableData>,
-      required: true,
-    },
     operationColumn: {
       type: Object as PropType<TableOperationColumn>,
       required: true,
@@ -29,26 +32,39 @@ export default defineComponent({
       type: Array as PropType<TableOperationColumn[]>,
       required: true,
     },
-    isRadio: {
-      type: Boolean,
+    record: {
+      type: Object as PropType<TableDataWithRaw>,
+      required: true,
     },
     hasExpand: {
       type: Boolean,
+      default: false,
     },
     selectedRowKeys: {
-      type: Array,
-      required: true,
+      type: Array as PropType<BaseType[]>,
     },
-    expandedRowKeys: {
-      type: Array,
-      required: true,
+    renderExpandBtn: {
+      type: Function as PropType<
+        (record: TableDataWithRaw, stopPropagation?: boolean) => VNode
+      >,
+    },
+    colSpan: {
+      type: Number,
+      default: 1,
+    },
+    rowSpan: {
+      type: Number,
+      default: 1,
+    },
+    summary: {
+      type: Boolean,
+      default: false,
     },
   },
-  emits: ['select', 'expand'],
-  setup(props, { emit }) {
+  emits: ['select'],
+  setup(props, { emit, slots }) {
     const prefixCls = getPrefixCls('table');
-    const tableCtx = inject(tableInjectionKey, undefined);
-
+    const tableCtx = inject<Partial<TableContext>>(tableInjectionKey, {});
     const style = computed(() =>
       getOperationStyle(props.operationColumn, props.operations)
     );
@@ -58,82 +74,95 @@ export default defineComponent({
       `${prefixCls}-operation`,
       {
         [`${prefixCls}-checkbox`]:
-          props.operationColumn.name === 'selection' && !props.isRadio,
+          props.operationColumn.name === 'selection-checkbox',
         [`${prefixCls}-radio`]:
-          props.operationColumn.name === 'selection' && props.isRadio,
+          props.operationColumn.name === 'selection-radio',
         [`${prefixCls}-expand`]: props.operationColumn.name === 'expand',
+        [`${prefixCls}-drag-handle`]:
+          props.operationColumn.name === 'drag-handle',
       },
       ...getOperationFixedCls(prefixCls, props.operationColumn),
     ]);
 
-    const renderSelection = () => {
-      const rowKey = props.record.key;
+    const leafKeys = computed(() => getLeafKeys(props.record));
 
-      if (props.isRadio) {
+    const selectionStatus = computed(() =>
+      getSelectionStatus(tableCtx.currentSelectedRowKeys ?? [], leafKeys.value)
+    );
+
+    const renderContent = () => {
+      if (props.summary) {
+        return null;
+      }
+      if (props.operationColumn.render) {
+        return props.operationColumn.render(props.record.raw);
+      }
+      if (props.operationColumn.name === 'selection-checkbox') {
+        const value = props.record.key;
+
+        if (!tableCtx.checkStrictly && !props.record.isLeaf) {
+          return (
+            <Checkbox
+              modelValue={selectionStatus.value.checked}
+              indeterminate={selectionStatus.value.indeterminate}
+              disabled={Boolean(props.record.disabled)}
+              uninjectGroupContext
+              onChange={(checked) =>
+                tableCtx.onSelectAllLeafs?.(props.record, checked as boolean)
+              }
+              // @ts-ignore
+              onClick={(ev: Event) => ev.stopPropagation()}
+            />
+          );
+        }
+
         return (
-          <Radio
-            modelValue={props.selectedRowKeys[0] ?? ''}
-            onChange={(value: string) => emit('select', [value])}
+          <Checkbox
+            modelValue={props.selectedRowKeys?.includes(value) ?? false}
             disabled={Boolean(props.record.disabled)}
-            value={rowKey}
+            uninjectGroupContext
+            onChange={(checked) =>
+              tableCtx.onSelect?.(checked as boolean, props.record)
+            }
+            // @ts-ignore
+            onClick={(ev: Event) => ev.stopPropagation()}
           />
         );
       }
-
-      return (
-        <Checkbox
-          modelValue={props.selectedRowKeys}
-          onChange={(values: string[]) => emit('select', values)}
-          disabled={Boolean(props.record.disabled)}
-          value={rowKey}
-        />
-      );
-    };
-
-    const renderExpand = () => {
-      if (!props.record.expand) {
-        return null;
-      }
-
-      const rowKey = props.record.key;
-      const expanded = props.expandedRowKeys.includes(rowKey);
-
-      return (
-        <button
-          class={`${prefixCls}-expand-btn`}
-          onClick={() => emit('expand', rowKey)}
-        >
-          {tableCtx?.expandIcon?.({ expanded, record: props.record }) ??
-          expanded ? (
-            <IconMinus />
-          ) : (
-            <IconPlus />
-          )}
-        </button>
-      );
-    };
-
-    const renderContent = () => {
-      if (props.operationColumn.name === 'selection') {
-        return renderSelection();
+      if (props.operationColumn.name === 'selection-radio') {
+        const value = props.record.key;
+        return (
+          <Radio
+            modelValue={props.selectedRowKeys?.includes(value) ?? false}
+            disabled={Boolean(props.record.disabled)}
+            uninjectGroupContext
+            onChange={(checked) =>
+              tableCtx.onSelect?.(checked as boolean, props.record)
+            }
+            // @ts-ignore
+            onClick={(ev: Event) => ev.stopPropagation()}
+          />
+        );
       }
       if (props.operationColumn.name === 'expand') {
-        if (props.hasExpand) {
-          return renderExpand();
+        if (props.hasExpand && props.renderExpandBtn) {
+          return props.renderExpandBtn(props.record);
         }
         return null;
       }
-      if (props.operationColumn.bodyNode) {
-        return props.operationColumn.bodyNode(props.record, {
-          class: cls.value,
-          style: style.value,
-        });
+      if (props.operationColumn.name === 'drag-handle') {
+        return slots['drag-handle-icon']?.() ?? <IconDragDotVertical />;
       }
       return null;
     };
 
     return () => (
-      <td class={cls.value} style={style.value}>
+      <td
+        class={cls.value}
+        style={style.value}
+        rowspan={props.rowSpan > 1 ? props.rowSpan : undefined}
+        colspan={props.colSpan > 1 ? props.colSpan : undefined}
+      >
         <span class={`${prefixCls}-cell`}>{renderContent()}</span>
       </td>
     );

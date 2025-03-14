@@ -16,9 +16,15 @@ export function isBoolean(obj: unknown): obj is boolean {
   return opt.call(obj) === '[object Boolean]';
 }
 
-export function isObject(obj: any): obj is { [key: string]: any } {
+export function isObject<T extends unknown>(
+  obj: T
+): obj is Extract<T, Record<string, any>> {
   return opt.call(obj) === '[object Object]';
 }
+
+export const isPromise = <T>(obj: unknown): obj is Promise<T> => {
+  return opt.call(obj) === '[object Promise]';
+};
 
 export function isString(obj: any): obj is string {
   return opt.call(obj) === '[object String]';
@@ -82,6 +88,10 @@ export const isArrayChildren = (
   children: VNodeNormalizedChildren
 ): children is VNode[] => {
   return isArray(children);
+};
+
+export const isQuarter = (fromat: string) => {
+  return /\[Q]Q/.test(fromat);
 };
 
 export function isDayjs(time: any): time is Dayjs {

@@ -37,6 +37,8 @@ const Carousel = () => import('@web-vue/components/carousel/README.zh-CN.md');
 const CarouselEn = () => import('@web-vue/components/carousel/README.en-US.md');
 const Collapse = () => import('@web-vue/components/collapse/README.zh-CN.md');
 const CollapseEn = () => import('@web-vue/components/collapse/README.en-US.md');
+const Calendar = () => import('@web-vue/components/calendar/README.zh-CN.md');
+const CalendarEn = () => import('@web-vue/components/calendar/README.en-US.md');
 const Comment = () => import('@web-vue/components/comment/README.zh-CN.md');
 const CommentEn = () => import('@web-vue/components/comment/README.en-US.md');
 const Descriptions = () =>
@@ -175,6 +177,24 @@ const Trigger = () => import('@web-vue/components/trigger/README.zh-CN.md');
 const TriggerEn = () => import('@web-vue/components/trigger/README.en-US.md');
 const Split = () => import('@web-vue/components/split/README.zh-CN.md');
 const SplitEn = () => import('@web-vue/components/split/README.en-US.md');
+const OverflowList = () =>
+  import('@web-vue/components/overflow-list/README.zh-CN.md');
+const OverflowListEn = () =>
+  import('@web-vue/components/overflow-list/README.en-US.md');
+const Scrollbar = () => import('@web-vue/components/scrollbar/README.zh-CN.md');
+const ScrollbarEn = () =>
+  import('@web-vue/components/scrollbar/README.en-US.md');
+const Watermark = () => import('@web-vue/components/watermark/README.zh-CN.md');
+const WatermarkEn = () =>
+  import('@web-vue/components/watermark/README.en-US.md');
+const VerificationCode = () =>
+  import('@web-vue/components/verification-code/README.zh-CN.md');
+const VerificationCodeEn = () =>
+  import('@web-vue/components/verification-code/README.en-US.md');
+const ColorPicker = () =>
+  import('@web-vue/components/color-picker/README.zh-CN.md');
+const ColorPickerEn = () =>
+  import('@web-vue/components/color-picker/README.en-US.md');
 
 const docs = [
   {
@@ -193,13 +213,85 @@ const docs = [
     componentEn: ThemeEn,
   },
   {
+    name: 'token',
+    component: () => import('./pages/token/token.vue'),
+  },
+  {
     name: 'i18n',
     component: I18n,
     componentEn: I18nEn,
   },
   {
+    name: 'faq',
+    component: () => import('./docs/faq.zh-CN.md'),
+    componentEn: () => import('./docs/faq.en-US.md'),
+  },
+  {
     name: 'changelog',
     component: Changelog,
+  },
+];
+
+const proDocs = [
+  {
+    name: 'start',
+    component: () => import('./docs/pro/start.zh-CN.md'),
+    componentEn: () => import('./docs/pro/start.en-US.md'),
+  },
+  {
+    name: 'npmScripts',
+    component: () => import('./docs/pro/npm-scripts.zh-CN.md'),
+    componentEn: () => import('./docs/pro/npm-scripts.en-US.md'),
+  },
+  {
+    name: 'directory',
+    component: () => import('./docs/pro/directory.zh-CN.md'),
+    componentEn: () => import('./docs/pro/directory.en-US.md'),
+  },
+  {
+    name: 'layout',
+    component: () => import('./docs/pro/layout.zh-CN.md'),
+    componentEn: () => import('./docs/pro/layout.en-US.md'),
+  },
+  {
+    name: 'routesAndMenu',
+    component: () => import('./docs/pro/routes-and-menu.zh-CN.md'),
+    componentEn: () => import('./docs/pro/routes-and-menu.en-US.md'),
+  },
+  {
+    name: 'permission',
+    component: () => import('./docs/pro/permission.zh-CN.md'),
+    componentEn: () => import('./docs/pro/permission.en-US.md'),
+  },
+  {
+    name: 'stateManagementPinia',
+    component: () => import('./docs/pro/state-management-pinia.zh-CN.md'),
+    componentEn: () => import('./docs/pro/state-management-pinia.en-US.md'),
+  },
+  {
+    name: 'stateManagement',
+    component: () => import('./docs/pro/state-management.zh-CN.md'),
+    componentEn: () => import('./docs/pro/state-management.en-US.md'),
+  },
+  {
+    name: 'i18n',
+    component: () => import('./docs/pro/i18n.zh-CN.md'),
+    componentEn: () => import('./docs/pro/i18n.en-US.md'),
+  },
+  {
+    name: 'mock',
+    component: () => import('./docs/pro/mock.zh-CN.md'),
+    componentEn: () => import('./docs/pro/mock.en-US.md'),
+  },
+  {
+    name: 'build',
+    component: () => import('./docs/pro/build.zh-CN.md'),
+    componentEn: () => import('./docs/pro/build.en-US.md'),
+  },
+  {
+    name: 'faq',
+    component: () => import('./docs/pro/faq.zh-CN.md'),
+    componentEn: () => import('./docs/pro/faq.en-US.md'),
   },
 ];
 
@@ -265,6 +357,11 @@ const components = [
         name: 'badge',
         component: Badge,
         componentEn: BadgeEn,
+      },
+      {
+        name: 'calendar',
+        component: Calendar,
+        componentEn: CalendarEn,
       },
       {
         name: 'card',
@@ -367,6 +464,11 @@ const components = [
         componentEn: CheckboxEn,
       },
       {
+        name: 'colorPicker',
+        component: ColorPicker,
+        componentEn: ColorPickerEn,
+      },
+      {
         name: 'datePicker',
         component: DatePicker,
         componentEn: DatePickerEn,
@@ -385,6 +487,11 @@ const components = [
         name: 'inputNumber',
         component: InputNumber,
         componentEn: InputNumberEn,
+      },
+      {
+        name: 'verificationCode',
+        component: VerificationCode,
+        componentEn: VerificationCodeEn,
       },
       {
         name: 'inputTag',
@@ -576,6 +683,21 @@ const components = [
         component: Split,
         componentEn: SplitEn,
       },
+      {
+        name: 'overflow',
+        component: OverflowList,
+        componentEn: OverflowListEn,
+      },
+      {
+        name: 'scrollbar',
+        component: Scrollbar,
+        componentEn: ScrollbarEn,
+      },
+      {
+        name: 'watermark',
+        component: Watermark,
+        componentEn: WatermarkEn,
+      },
     ],
   },
 ];
@@ -641,6 +763,25 @@ for (const group of components) {
   componentMenu.push(menuGroup);
 }
 
+const proDocsMenu: { path: string; name: string }[] = [];
+proDocs.forEach((item) => {
+  const path = `/vue/docs/pro/${toKebabCase(item.name)}`;
+  routes.push(
+    {
+      path,
+      component: item.component,
+    },
+    {
+      path: `/vue/en-US/docs/pro/${toKebabCase(item.name)}`,
+      component: item.componentEn ?? item.component,
+    }
+  );
+  proDocsMenu.push({
+    name: item.name,
+    path,
+  });
+});
+
 // Add redirects for unmatched routes at the end
 routes.push({ path: '/vue/en-US', redirect: '/vue/en-US/docs/start' });
 routes.push({ path: '/:pathMatch(.*)*', redirect: '/vue/docs/start' });
@@ -656,13 +797,26 @@ const router = createRouter({
   },
 });
 
-router.beforeEach(() => {
-  nProgress.start();
+router.beforeEach((to, from) => {
+  if (to.path !== from.path) {
+    nProgress.start();
+  }
 });
 
 router.afterEach(() => {
   nProgress.done();
 });
 
-export { docsMenu, componentMenu };
+const docsMenuList = [
+  {
+    name: 'docs',
+    menu: docsMenu,
+  },
+  {
+    name: 'proDocs',
+    menu: proDocsMenu,
+  },
+];
+
+export { docsMenu, componentMenu, proDocsMenu, docsMenuList };
 export default router;

@@ -21,8 +21,18 @@ description: Only input boxes in numeric format are allowed.
 
 @import ./__demo__/mode.md
 
+@import ./__demo__/size.md
+
 @import ./__demo__/precision.md
 
+@import ./__demo__/prefix.md
+
+@import ./__demo__/step-icon.md
+
 @import ./__demo__/format.md
+
+@import ./__demo__/model.md
+
+## API
 
 %%API(input-number.tsx)%%

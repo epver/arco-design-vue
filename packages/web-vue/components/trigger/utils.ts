@@ -1,11 +1,15 @@
 import type { CSSProperties } from 'vue';
 import type { TriggerPosition } from '../_utils/constant';
 import { isArray } from '../_utils/is';
+import { getDocumentSize, Size } from '../_utils/dom';
+import type { TriggerPopupTranslate } from './interface';
 
-const getViewPortSize = () => {
+const getViewPortSize = (): Size => {
+  const { height, width } = getDocumentSize();
+
   return {
-    width: document.documentElement.clientWidth || window.innerWidth,
-    height: document.documentElement.clientHeight || window.innerHeight,
+    width: Math.min(width, window.innerWidth),
+    height: Math.min(height, window.innerHeight),
   };
 };
 
@@ -46,8 +50,8 @@ export const getElementScrollRect = (
     scrollBottom: rect.bottom - containerRect.top,
     scrollLeft: rect.left - containerRect.left,
     scrollRight: rect.right - containerRect.left,
-    width: element.offsetWidth,
-    height: element.offsetHeight,
+    width: element.offsetWidth ?? element.clientWidth,
+    height: element.offsetHeight ?? element.clientHeight,
   };
 };
 
@@ -149,7 +153,7 @@ const getFitPosition = (
     triggerRect: ScrollRect;
     popupRect: ScrollRect;
     offset: number;
-    translate: PopupTranslate;
+    translate: TriggerPopupTranslate;
   }
 ) => {
   const direction = getBoundaryPosition(position);
@@ -254,10 +258,6 @@ const getFitPosition = (
   };
 };
 
-export type PopupTranslate =
-  | [number, number]
-  | { [key in TriggerPosition]?: [number, number] };
-
 const getPopupOffset = (
   position: TriggerPosition,
   triggerRect: ScrollRect,
@@ -267,7 +267,7 @@ const getPopupOffset = (
     translate = [0, 0],
   }: {
     offset?: number;
-    translate?: PopupTranslate;
+    translate?: TriggerPopupTranslate;
   } = {}
 ): PositionOffset => {
   // prettier-ignore
@@ -358,6 +358,22 @@ const getPopupOffset = (
   }
 };
 
+export const getTransformOrigin = (position: TriggerPosition) => {
+  let originX = '0';
+  if (['top', 'bottom'].includes(position)) {
+    originX = '50%';
+  } else if (['left', 'lt', 'lb', 'tr', 'br'].includes(position)) {
+    originX = '100%';
+  }
+  let originY = '0';
+  if (['left', 'right'].includes(position)) {
+    originY = '50%';
+  } else if (['top', 'tl', 'tr', 'lb', 'rb'].includes(position)) {
+    originY = '100%';
+  }
+  return `${originX} ${originY}`;
+};
+
 export const getPopupStyle = (
   position: TriggerPosition,
   containerRect: DOMRect,
@@ -368,13 +384,11 @@ export const getPopupStyle = (
     translate = [0, 0],
     customStyle = {},
     autoFitPosition = false,
-    autoFitTransformOrigin = false,
   }: {
     offset?: number;
-    translate?: PopupTranslate;
+    translate?: TriggerPopupTranslate;
     customStyle?: CSSProperties;
     autoFitPosition?: boolean;
-    autoFitTransformOrigin?: boolean;
   } = {}
 ): { style: CSSProperties; position: TriggerPosition } => {
   let finalPosition = position;
@@ -401,129 +415,76 @@ export const getPopupStyle = (
     ...customStyle,
   };
 
-  if (autoFitTransformOrigin) {
-    let originX = '0';
-    if (['top', 'bottom'].includes(finalPosition)) {
-      originX = '50%';
-    } else if (['left', 'lt', 'lb', 'tr', 'br'].includes(finalPosition)) {
-      originX = '100%';
-    }
-    let originY = '0';
-    if (['left', 'right'].includes(finalPosition)) {
-      originY = '50%';
-    } else if (['top', 'tl', 'tr', 'lt', 'rt'].includes(finalPosition)) {
-      originY = '100%';
-    }
-    style.transformOrigin = `${originX} ${originY}`;
-  }
-
   return {
     style,
     position: finalPosition,
   };
 };
 
-const withRotate = (transform: string): string => {
-  return `${transform} rotate(45deg)`;
-};
-
 export const getArrowStyle = (
   position: TriggerPosition,
   triggerRect: ScrollRect,
+  popupRect: ScrollRect,
   {
     customStyle = {},
   }: {
     customStyle?: CSSProperties;
   }
 ): CSSProperties => {
-  switch (position) {
-    case 'top':
+  if (['top', 'tl', 'tr', 'bottom', 'bl', 'br'].includes(position)) {
+    let offsetLeft = Math.abs(
+      triggerRect.scrollLeft + triggerRect.width / 2 - popupRect.scrollLeft
+    );
+
+    if (offsetLeft > popupRect.width - 8) {
+      if (triggerRect.width > popupRect.width) {
+        offsetLeft = popupRect.width / 2;
+      } else {
+        offsetLeft = popupRect.width - 8;
+      }
+    }
+
+    if (['top', 'tl', 'tr'].includes(position)) {
       return {
-        left: '50%',
+        left: `${offsetLeft}px`,
         bottom: '0',
-        transform: withRotate('translate(-50%,50%)'),
+        transform: 'translate(-50%,50%) rotate(45deg)',
         ...customStyle,
       };
-    case 'tl':
-      return {
-        left: `${Math.round(triggerRect.width / 2)}px`,
-        bottom: '0',
-        transform: withRotate('translate(-50%,50%)'),
-        ...customStyle,
-      };
-    case 'tr':
-      return {
-        right: `${Math.round(triggerRect.width / 2)}px`,
-        bottom: '0',
-        transform: withRotate('translate(50%,50%)'),
-        ...customStyle,
-      };
-    case 'bottom':
-      return {
-        left: '50%',
-        top: '0',
-        transform: withRotate('translate(-50%,-50%)'),
-        ...customStyle,
-      };
-    case 'bl':
-      return {
-        left: `${Math.round(triggerRect.width / 2)}px`,
-        top: '0',
-        transform: withRotate('translate(-50%,-50%)'),
-        ...customStyle,
-      };
-    case 'br':
-      return {
-        right: `${Math.round(triggerRect.width / 2)}px`,
-        top: '0',
-        transform: withRotate('translate(50%,-50%)'),
-        ...customStyle,
-      };
-    case 'left':
-      return {
-        right: '0',
-        top: '50%',
-        transform: withRotate('translate(50%,-50%)'),
-        ...customStyle,
-      };
-    case 'lt':
-      return {
-        right: '0',
-        top: `${Math.round(triggerRect.height / 2)}px`,
-        transform: withRotate('translate(50%,-50%)'),
-        ...customStyle,
-      };
-    case 'lb':
-      return {
-        right: '0',
-        bottom: `${Math.round(triggerRect.height / 2)}px`,
-        transform: withRotate('translate(50%,50%)'),
-        ...customStyle,
-      };
-    case 'right':
-      return {
-        left: '0',
-        top: '50%',
-        transform: withRotate('translate(-50%,-50%)'),
-        ...customStyle,
-      };
-    case 'rt':
-      return {
-        left: '0',
-        top: `${Math.round(triggerRect.height / 2)}px`,
-        transform: withRotate('translate(-50%,-50%)'),
-        ...customStyle,
-      };
-    case 'rb':
-      return {
-        left: '0',
-        bottom: `${Math.round(triggerRect.height / 2)}px`,
-        transform: withRotate('translate(-50%,50%)'),
-        ...customStyle,
-      };
-    default:
-      return {};
+    }
+    return {
+      left: `${offsetLeft}px`,
+      top: '0',
+      transform: 'translate(-50%,-50%) rotate(45deg)',
+      ...customStyle,
+    };
   }
+  let offsetTop = Math.abs(
+    triggerRect.scrollTop + triggerRect.height / 2 - popupRect.scrollTop
+  );
+
+  if (offsetTop > popupRect.height - 8) {
+    if (triggerRect.height > popupRect.height) {
+      offsetTop = popupRect.height / 2;
+    } else {
+      offsetTop = popupRect.height - 8;
+    }
+  }
+
+  if (['left', 'lt', 'lb'].includes(position)) {
+    return {
+      top: `${offsetTop}px`,
+      right: '0',
+      transform: 'translate(50%,-50%) rotate(45deg)',
+      ...customStyle,
+    };
+  }
+  return {
+    top: `${offsetTop}px`,
+    left: '0',
+    transform: 'translate(-50%,-50%) rotate(45deg)',
+    ...customStyle,
+  };
 };
 
 export const isScrollElement = (element: HTMLElement) => {
@@ -533,14 +494,14 @@ export const isScrollElement = (element: HTMLElement) => {
   );
 };
 
-export const getScrollElements = (container: HTMLElement) => {
+export const getScrollElements = (container: HTMLElement | undefined) => {
   const scrollElements: HTMLElement[] = [];
-  let element: HTMLElement | null = container;
+  let element: HTMLElement | undefined = container;
   while (element && element !== document.documentElement) {
     if (isScrollElement(element)) {
       scrollElements.push(element);
     }
-    element = element.parentElement;
+    element = element.parentElement ?? undefined;
   }
   return scrollElements;
 };

@@ -1,10 +1,4 @@
-import type {
-  PropType,
-  CSSProperties,
-  ComponentPublicInstance,
-  Ref,
-  VNode,
-} from 'vue';
+import type { PropType, CSSProperties, Ref } from 'vue';
 import {
   defineComponent,
   ref,
@@ -14,38 +8,46 @@ import {
   watch,
   inject,
   provide,
-  withDirectives,
   Teleport,
   Transition,
   onUpdated,
   onMounted,
   onBeforeUnmount,
-  vShow,
+  toRefs,
+  onDeactivated,
 } from 'vue';
 import { getPrefixCls } from '../_utils/global-config';
-import type { AnimationDuration, ClassName, Data } from '../_utils/types';
 import type { TriggerEvent, TriggerPosition } from '../_utils/constant';
-import { TRIGGER_EVENTS } from '../_utils/constant';
 import {
   getArrowStyle,
   getPopupStyle,
-  PopupTranslate,
   getElementScrollRect,
   getScrollElements,
+  getTransformOrigin,
 } from './utils';
-import ResizeObserver from '../_components/resize-observer';
-import { getElement, off, on } from '../_utils/dom';
-import {
-  isEmptyChildren,
-  isComponentInstance,
-  mergeFirstChild,
-} from '../_utils/vue-utils';
+import ResizeObserver from '../_components/resize-observer-v2';
+import { off, on } from '../_utils/dom';
+import { isEmptyChildren, mergeFirstChild } from '../_utils/vue-utils';
 import usePickSlots from '../_hooks/use-pick-slots';
 import { triggerInjectionKey } from './context';
-import { zIndexInjectionKey } from '../modal/context';
 import { throttleByRaf } from '../_utils/throttle-by-raf';
+import usePopupManager from '../_hooks/use-popup-manager';
+import { useResizeObserver } from '../_hooks/use-resize-observer';
+import ClientOnly from '../_components/client-only';
+import { useTeleportContainer } from '../_hooks/use-teleport-container';
+import { TriggerPopupTranslate } from './interface';
+import { configProviderInjectionKey } from '../config-provider/context';
+import { useFirstElement } from '../_hooks/use-first-element';
+import { omit } from '../_utils/omit';
 
-const Z_INDEX_STEP = 100;
+const TRIGGER_EVENTS = [
+  'onClick',
+  'onMouseenter',
+  'onMouseleave',
+  'onFocusin',
+  'onFocusout',
+  'onContextmenu',
+];
 
 export default defineComponent({
   name: 'Trigger',
@@ -76,15 +78,6 @@ export default defineComponent({
     trigger: {
       type: [String, Array] as PropType<TriggerEvent | TriggerEvent[]>,
       default: 'hover',
-      validator: (value: any) => {
-        const values: any[] = [].concat(value);
-        for (const value of values) {
-          if (!TRIGGER_EVENTS.includes(value)) {
-            return false;
-          }
-        }
-        return true;
-      },
     },
     /**
      * @zh 弹出位置
@@ -116,7 +109,7 @@ export default defineComponent({
      * @en The moving distance of the popup
      */
     popupTranslate: {
-      type: [Array, Object] as PropType<PopupTranslate>,
+      type: [Array, Object] as PropType<TriggerPopupTranslate>,
     },
     /**
      * @zh 弹出框是否显示箭头
@@ -179,7 +172,7 @@ export default defineComponent({
      * @en The class name of the popup content
      */
     contentClass: {
-      type: [String, Array, Object] as PropType<ClassName>,
+      type: [String, Array, Object],
     },
     /**
      * @zh 弹出框内容的样式
@@ -193,7 +186,7 @@ export default defineComponent({
      * @en The class name of the popup arrow
      */
     arrowClass: {
-      type: [String, Array, Object] as PropType<ClassName>,
+      type: [String, Array, Object],
     },
     /**
      * @zh 弹出框箭头的样式
@@ -222,7 +215,13 @@ export default defineComponent({
      * @en The duration of the popup animation
      */
     duration: {
-      type: [Number, Object] as PropType<AnimationDuration>,
+      type: [Number, Object] as PropType<
+        | number
+        | {
+            enter: number;
+            leave: number;
+          }
+      >,
     },
     /**
      * @zh mouseenter事件延时触发的时间（毫秒）
@@ -277,9 +276,7 @@ export default defineComponent({
      * @en Mount container for popup
      */
     popupContainer: {
-      type: [String, Object] as PropType<
-        string | HTMLElement | null | undefined
-      >,
+      type: [String, Object] as PropType<string | HTMLElement>,
     },
     /**
      * @zh 是否在容器滚动时更新弹出框的位置
@@ -297,8 +294,8 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
-    openedCls: {
-      type: String,
+    openedClass: {
+      type: [String, Array, Object],
     },
     /**
      * @zh 是否自动调整弹出框位置，以适应窗口大小
@@ -316,68 +313,106 @@ export default defineComponent({
       type: Boolean,
       default: true,
     },
-    // for JSX
-    onPopupVisibleChange: {
-      type: Function as PropType<(popupVisible: boolean) => void>,
+    /**
+     * @zh 是否阻止弹出层中的元素点击时获取焦点
+     * @en Whether to prevent elements in the pop-up layer from gaining focus when clicked
+     */
+    preventFocus: {
+      type: Boolean,
+      default: false,
+    },
+    /**
+     * @zh 是否在滚动时关闭弹出框
+     * @en Whether to close the popover when scrolling
+     * @version 2.46.0
+     */
+    scrollToClose: {
+      type: Boolean,
+      default: false,
+    },
+    /**
+     * @zh 滚动阈值，当滚动距离超过该值时触发关闭
+     * @en Scroll threshold, trigger close when the scroll distance exceeds this value
+     */
+    scrollToCloseDistance: {
+      type: Number,
+      default: 0,
     },
   },
-  emits: [
-    'update:popupVisible',
+  emits: {
+    'update:popupVisible': (visible: boolean) => true,
     /**
      * @zh 弹出框显示状态改变时触发
      * @en Emitted when the status of the popup changes
-     * @property {boolean} popupVisible
+     * @param {boolean} visible
      */
-    'popupVisibleChange',
-  ],
+    'popupVisibleChange': (visible: boolean) => true,
+    /**
+     * @zh 弹出框显示后（动画结束）触发
+     * @en Triggered after the trigger is shown (the animation ends)
+     * @version 2.18.0
+     */
+    'show': () => true,
+    /**
+     * @zh 弹出框隐藏后（动画结束）触发
+     * @en Triggered after the popup is hidden (the animation ends)
+     * @version 2.18.0
+     */
+    'hide': () => true,
+    // for internal
+    'resize': () => true,
+  },
   /**
    * @zh 弹出框内容
    * @en Popup content
    * @slot content
    */
   setup(props, { emit, slots, attrs }) {
+    const { popupContainer } = toRefs(props);
     const prefixCls = getPrefixCls('trigger');
+    const popupAttrs = computed(() => omit(attrs, TRIGGER_EVENTS));
+    const configCtx = inject(configProviderInjectionKey, undefined);
+
     const triggerMethods = computed(() =>
       ([] as Array<TriggerEvent>).concat(props.trigger)
     );
     // 用于多个trigger嵌套时，保持打开状态
     const childrenRefs = new Set<Ref<HTMLElement>>();
     const triggerCtx = inject(triggerInjectionKey, undefined);
-    // z-index上下文
-    const zIndexCtx = inject(zIndexInjectionKey, undefined);
-    const zIndex = (zIndexCtx?.zIndex ?? 0) + Z_INDEX_STEP;
     // trigger相关变量
-    const triggerRef = ref<Element | ComponentPublicInstance>();
-    const triggerEle = computed<HTMLElement>(() =>
-      isComponentInstance(triggerRef.value)
-        ? triggerRef.value.$el
-        : triggerRef.value
-    );
-    const triggerEvent: Data = {};
+    const { children, firstElement } = useFirstElement();
     // popup相关变量
     const popupRef = ref<HTMLElement>();
     const popupVisible = ref(props.defaultPopupVisible);
     const popupPosition = ref(props.position);
-    const popupEvent: Data = {};
     const popupStyle = ref<CSSProperties>({});
+    const transformStyle = ref<CSSProperties>({});
     const arrowStyle = ref<CSSProperties>({});
-    // container相关变量
-    const containerEle = computed(() =>
-      getElement(props.popupContainer ?? document.documentElement)
-    );
     // 鼠标相关变量
     const arrowRef = ref<HTMLElement>();
-    const mousePosition = ref<CSSProperties>({
-      top: '0px',
-      left: '0px',
+    const mousePosition = ref({
+      top: 0,
+      left: 0,
     });
+
+    let scrollPosition: [number, number] | null = null;
+    let windowScrollPosition: [number, number] | null = null;
 
     const computedVisible = computed(
       () => props.popupVisible ?? popupVisible.value
     );
 
+    const { teleportContainer, containerRef } = useTeleportContainer({
+      popupContainer,
+      visible: computedVisible,
+      documentContainer: true,
+    });
+
+    const { zIndex } = usePopupManager('popup', { visible: computedVisible });
+
     let delayTimer = 0;
     let outsideListener = false;
+    let windowListener = false;
 
     const cleanDelayTimer = () => {
       if (delayTimer) {
@@ -390,55 +425,73 @@ export default defineComponent({
       if (props.alignPoint) {
         const { pageX, pageY } = e;
         mousePosition.value = {
-          top: `${pageY}px`,
-          left: `${pageX}px`,
+          top: pageY,
+          left: pageX,
         };
       }
     };
 
     const updatePopupStyle = () => {
-      if (props.alignPoint) {
-        // 根据鼠标位置显示popup
-        popupStyle.value = mousePosition.value;
-      } else {
-        // 根据position显示popup
-        if (!triggerEle.value || !popupRef.value || !containerEle.value) {
-          return;
-        }
-        const containerRect = containerEle.value.getBoundingClientRect();
-        const triggerRect = getElementScrollRect(
-          triggerEle.value,
-          containerRect
-        );
-        const popupRect = getElementScrollRect(popupRef.value, containerRect);
-        const { style, position } = getPopupStyle(
-          props.position,
-          containerRect,
-          triggerRect,
-          popupRect,
-          {
-            offset: props.popupOffset,
-            translate: props.popupTranslate,
-            customStyle: props.popupStyle,
-            autoFitPosition: props.autoFitPosition,
-            autoFitTransformOrigin: props.autoFitTransformOrigin,
+      if (!firstElement.value || !popupRef.value || !containerRef.value) {
+        return;
+      }
+      const containerRect = containerRef.value.getBoundingClientRect();
+      const triggerRect = props.alignPoint
+        ? {
+            top: mousePosition.value.top,
+            bottom: mousePosition.value.top,
+            left: mousePosition.value.left,
+            right: mousePosition.value.left,
+            scrollTop: mousePosition.value.top,
+            scrollBottom: mousePosition.value.top,
+            scrollLeft: mousePosition.value.left,
+            scrollRight: mousePosition.value.left,
+            width: 0,
+            height: 0,
           }
-        );
-        if (props.autoFitPopupMinWidth) {
-          style.minWidth = `${triggerRect.width}px`;
-        } else if (props.autoFitPopupWidth) {
-          style.width = `${triggerRect.width}px`;
+        : getElementScrollRect(firstElement.value, containerRect);
+      const getPopupRect = () =>
+        // @ts-ignore
+        getElementScrollRect(popupRef.value, containerRect);
+      const popupRect = getPopupRect();
+      const { style, position } = getPopupStyle(
+        props.position,
+        containerRect,
+        triggerRect,
+        popupRect,
+        {
+          offset: props.popupOffset,
+          translate: props.popupTranslate,
+          customStyle: props.popupStyle,
+          autoFitPosition: props.autoFitPosition,
         }
+      );
+      if (props.autoFitTransformOrigin) {
+        transformStyle.value = {
+          transformOrigin: getTransformOrigin(position),
+        };
+      }
+      if (props.autoFitPopupMinWidth) {
+        style.minWidth = `${triggerRect.width}px`;
+      } else if (props.autoFitPopupWidth) {
+        style.width = `${triggerRect.width}px`;
+      }
 
-        if (popupPosition.value !== position) {
-          popupPosition.value = position;
-        }
-        popupStyle.value = style;
-        if (props.showArrow) {
-          arrowStyle.value = getArrowStyle(position, triggerRect, {
-            customStyle: props.arrowStyle,
-          });
-        }
+      if (popupPosition.value !== position) {
+        popupPosition.value = position;
+      }
+      popupStyle.value = style;
+      if (props.showArrow) {
+        nextTick(() => {
+          arrowStyle.value = getArrowStyle(
+            position,
+            triggerRect,
+            getPopupRect(),
+            {
+              customStyle: props.arrowStyle,
+            }
+          );
+        });
       }
     };
 
@@ -458,68 +511,96 @@ export default defineComponent({
         }
       };
 
+      if (!visible) {
+        scrollPosition = null;
+        windowScrollPosition = null;
+      }
+
       if (delay) {
         cleanDelayTimer();
-        delayTimer = window.setTimeout(update, delay);
+        if (visible !== computedVisible.value) {
+          delayTimer = window.setTimeout(update, delay);
+        }
       } else {
         update();
       }
     };
 
     const handleClick = (e: MouseEvent) => {
-      if (computedVisible.value && !props.clickToClose) {
+      (attrs as any).onClick?.(e);
+      if (props.disabled || (computedVisible.value && !props.clickToClose)) {
         return;
       }
-      updateMousePosition(e);
-      changeVisible(!computedVisible.value);
+      if (triggerMethods.value.includes('click')) {
+        updateMousePosition(e);
+        changeVisible(!computedVisible.value);
+      } else if (
+        triggerMethods.value.includes('contextMenu') &&
+        computedVisible.value
+      ) {
+        changeVisible(false);
+      }
     };
 
     const handleMouseEnter = (e: MouseEvent) => {
-      triggerCtx?.onMouseenter();
+      (attrs as any).onMouseenter?.(e);
+      if (props.disabled || !triggerMethods.value.includes('hover')) {
+        return;
+      }
       updateMousePosition(e);
       changeVisible(true, props.mouseEnterDelay);
     };
 
-    const handleMouseLeave = () => {
-      triggerCtx?.onMouseleave();
+    const handleMouseEnterWithContext = (e: MouseEvent) => {
+      triggerCtx?.onMouseenter(e);
+      handleMouseEnter(e);
+    };
+
+    const handleMouseLeave = (e: MouseEvent) => {
+      (attrs as any).onMouseleave?.(e);
+      if (props.disabled || !triggerMethods.value.includes('hover')) {
+        return;
+      }
       changeVisible(false, props.mouseLeaveDelay);
     };
 
-    const handleFocusin = () => {
-      triggerCtx?.onFocusin();
+    const handleMouseLeaveWithContext = (e: MouseEvent) => {
+      triggerCtx?.onMouseleave(e);
+      handleMouseLeave(e);
+    };
+
+    const handleFocusin = (e: FocusEvent) => {
+      (attrs as any).onFocusin?.(e);
+      if (props.disabled || !triggerMethods.value.includes('focus')) {
+        return;
+      }
       changeVisible(true, props.focusDelay);
     };
 
-    const handleFocusout = () => {
-      triggerCtx?.onFocusout();
+    const handleFocusout = (e: FocusEvent) => {
+      (attrs as any).onFocusout?.(e);
+      if (props.disabled || !triggerMethods.value.includes('focus')) {
+        return;
+      }
       if (!props.blurToClose) {
         return;
       }
       changeVisible(false);
     };
 
-    // 依据triggerMethods绑定事件
-    if (triggerMethods.value.includes('click')) {
-      triggerEvent.onClick = handleClick;
-    }
-    if (triggerMethods.value.includes('hover')) {
-      triggerEvent.onMouseenter = handleMouseEnter;
-      triggerEvent.onMouseleave = handleMouseLeave;
-      if (props.popupHoverStay) {
-        popupEvent.onMouseenter = handleMouseEnter;
-        popupEvent.onMouseleave = handleMouseLeave;
+    const handleContextmenu = (e: MouseEvent) => {
+      (attrs as any).onContextmenu?.(e);
+      if (
+        props.disabled ||
+        !triggerMethods.value.includes('contextMenu') ||
+        (computedVisible.value && !props.clickToClose)
+      ) {
+        return;
       }
-    }
-    if (triggerMethods.value.includes('focus')) {
-      triggerEvent.onFocusin = handleFocusin;
-      triggerEvent.onFocusout = handleFocusout;
-    }
-    if (triggerMethods.value.includes('contextMenu')) {
-      triggerEvent.onContextmenu = (e: MouseEvent) => {
-        e.preventDefault();
-        handleClick(e);
-      };
-    }
+      updateMousePosition(e);
+      changeVisible(!computedVisible.value);
+      e.preventDefault();
+    };
 
     const addChildRef = (ref: any) => {
       childrenRefs.add(ref);
@@ -534,20 +615,16 @@ export default defineComponent({
     provide(
       triggerInjectionKey,
       reactive({
-        onMouseenter: handleMouseEnter,
-        onMouseleave: handleMouseLeave,
-        onFocusin: handleFocusin,
-        onFocusout: handleFocusout,
+        onMouseenter: handleMouseEnterWithContext,
+        onMouseleave: handleMouseLeaveWithContext,
         addChildRef,
         removeChildRef,
       })
     );
 
-    provide(zIndexInjectionKey, reactive({ zIndex }));
-
     // 外部事件
     const removeOutsideListener = () => {
-      off(document.body, 'mousedown', handleOutsideClick);
+      off(document.documentElement, 'mousedown', handleOutsideClick);
       outsideListener = false;
     };
 
@@ -559,7 +636,7 @@ export default defineComponent({
 
     const handleOutsideClick = (e: MouseEvent) => {
       if (
-        triggerEle.value?.contains(e.target as HTMLElement) ||
+        firstElement.value?.contains(e.target as HTMLElement) ||
         popupRef.value?.contains(e.target as HTMLElement)
       ) {
         return;
@@ -575,9 +652,49 @@ export default defineComponent({
       changeVisible(false);
     };
 
-    const handleScroll = throttleByRaf(() => {
+    const isExceedThreshold = (
+      oldPosition: [number, number],
+      element: HTMLElement
+    ) => {
+      const [scrollTop, scrollLeft] = oldPosition;
+      const { scrollTop: newScrollTop, scrollLeft: newScrollLeft } = element;
+      return (
+        Math.abs(newScrollTop - scrollTop) >= props.scrollToCloseDistance ||
+        Math.abs(newScrollLeft - scrollLeft) >= props.scrollToCloseDistance
+      );
+    };
+
+    const handleScroll = throttleByRaf((e) => {
       if (computedVisible.value) {
-        updatePopupStyle();
+        if (props.scrollToClose || configCtx?.scrollToClose) {
+          const element = e.target as HTMLElement;
+          if (!scrollPosition) {
+            scrollPosition = [element.scrollTop, element.scrollLeft];
+          }
+          if (isExceedThreshold(scrollPosition, element)) {
+            changeVisible(false);
+          } else {
+            updatePopupStyle();
+          }
+        } else {
+          updatePopupStyle();
+        }
+      }
+    });
+
+    const removeWindowScroll = () => {
+      off(window, 'scroll', onWindowScroll);
+      windowListener = false;
+    };
+
+    const onWindowScroll = throttleByRaf((e) => {
+      const element = e.target.documentElement;
+      if (!windowScrollPosition) {
+        windowScrollPosition = [element.scrollTop, element.scrollLeft];
+      }
+      if (isExceedThreshold(windowScrollPosition, element)) {
+        changeVisible(false);
+        removeWindowScroll();
       }
     });
 
@@ -587,31 +704,44 @@ export default defineComponent({
       }
     };
 
+    const onTargetResize = () => {
+      handleResize();
+      emit('resize');
+    };
+
+    const handlePopupMouseDown = (e: Event) => {
+      if (props.preventFocus) {
+        e.preventDefault();
+      }
+    };
+
     triggerCtx?.addChildRef(popupRef);
 
     const triggerCls = computed(() => {
-      return computedVisible.value ? props.openedCls : undefined;
+      return computedVisible.value ? props.openedClass : undefined;
     });
 
-    let scrollElements: HTMLElement[];
+    let scrollElements: HTMLElement[] | undefined;
 
     // 当popup显示状态改变时，修改外部点击事件
     watch(computedVisible, (value) => {
       if (props.clickOutsideToClose) {
-        if (outsideListener && !value) {
+        if (!value && outsideListener) {
           removeOutsideListener();
-          return;
-        }
-
-        if (!outsideListener) {
-          on(document.body, 'mousedown', handleOutsideClick);
+        } else if (value && !outsideListener) {
+          on(document.documentElement, 'mousedown', handleOutsideClick);
           outsideListener = true;
         }
       }
 
-      if (props.updateAtScroll) {
+      if (props.scrollToClose || configCtx?.scrollToClose) {
+        on(window, 'scroll', onWindowScroll);
+        windowListener = true;
+      }
+
+      if (props.updateAtScroll || configCtx?.updateAtScroll) {
         if (value) {
-          scrollElements = getScrollElements(triggerEle.value);
+          scrollElements = getScrollElements(firstElement.value);
           for (const item of scrollElements) {
             item.addEventListener('scroll', handleScroll);
           }
@@ -619,7 +749,12 @@ export default defineComponent({
           for (const item of scrollElements) {
             item.removeEventListener('scroll', handleScroll);
           }
+          scrollElements = undefined;
         }
+      }
+
+      if (value) {
+        mounted.value = true;
       }
     });
 
@@ -633,10 +768,27 @@ export default defineComponent({
       }
     );
 
+    const { createResizeObserver, destroyResizeObserver } = useResizeObserver({
+      elementRef: containerRef,
+      onResize: handleResize,
+    });
+
     onMounted(() => {
+      createResizeObserver();
+
       // 默认显示时，更新popup位置
       if (computedVisible.value) {
         updatePopupStyle();
+        if (props.clickOutsideToClose && !outsideListener) {
+          on(document.documentElement, 'mousedown', handleOutsideClick);
+          outsideListener = true;
+        }
+        if (props.updateAtScroll || configCtx?.updateAtScroll) {
+          scrollElements = getScrollElements(firstElement.value);
+          for (const item of scrollElements) {
+            item.addEventListener('scroll', handleScroll);
+          }
+        }
       }
     });
 
@@ -646,67 +798,132 @@ export default defineComponent({
       }
     });
 
-    onBeforeUnmount(() => {
-      triggerCtx?.removeChildRef(popupRef);
+    onDeactivated(() => {
+      changeVisible(false);
     });
 
-    return () => {
-      const children = slots.default?.() ?? [];
-      if (!props.disabled && children) {
-        mergeFirstChild(children, {
-          ref: triggerRef,
-          class: triggerCls.value,
-          ...triggerEvent,
-        });
+    onBeforeUnmount(() => {
+      triggerCtx?.removeChildRef(popupRef);
+      destroyResizeObserver();
+      if (outsideListener) {
+        removeOutsideListener();
       }
+      if (windowListener) {
+        removeWindowScroll();
+      }
+      if (scrollElements) {
+        for (const item of scrollElements) {
+          item.removeEventListener('scroll', handleScroll);
+        }
+        scrollElements = undefined;
+      }
+    });
+
+    const mounted = ref(computedVisible.value);
+    const isAnimation = ref(false);
+
+    const onAnimationStart = () => {
+      isAnimation.value = true;
+    };
+
+    const handleShow = () => {
+      isAnimation.value = false;
+      if (computedVisible.value) {
+        emit('show');
+      }
+    };
+
+    const handleHide = () => {
+      isAnimation.value = false;
+      if (!computedVisible.value) {
+        mounted.value = false;
+        emit('hide');
+      }
+    };
+
+    return () => {
+      children.value = slots.default?.() ?? [];
+
+      mergeFirstChild(children.value, {
+        class: triggerCls.value,
+        onClick: handleClick,
+        onMouseenter: handleMouseEnter,
+        onMouseleave: handleMouseLeave,
+        onFocusin: handleFocusin,
+        onFocusout: handleFocusout,
+        onContextmenu: handleContextmenu,
+      });
 
       return (
         <>
           {props.autoFixPosition ? (
-            <ResizeObserver onResize={handleResize}>{children}</ResizeObserver>
+            <ResizeObserver onResize={onTargetResize}>
+              {children.value}
+            </ResizeObserver>
           ) : (
-            children
+            children.value
           )}
-          <Teleport
-            to={props.popupContainer ?? 'body'}
-            disabled={!props.renderToBody}
-          >
-            <Transition name={props.animationName} duration={props.duration}>
-              {(!props.unmountOnClose || computedVisible.value) &&
-                !hidePopup.value &&
-                withDirectives(
-                  (
+          <ClientOnly>
+            <Teleport
+              to={teleportContainer.value}
+              disabled={!props.renderToBody}
+            >
+              {(!props.unmountOnClose ||
+                computedVisible.value ||
+                mounted.value) &&
+                !hidePopup.value && (
+                  <ResizeObserver onResize={handleResize}>
                     <div
                       ref={popupRef}
                       class={[
                         `${prefixCls}-popup`,
                         `${prefixCls}-position-${popupPosition.value}`,
                       ]}
-                      style={{ ...popupStyle.value, zIndex }}
+                      style={{
+                        ...popupStyle.value,
+                        zIndex: zIndex.value,
+                        pointerEvents: isAnimation.value ? 'none' : 'auto',
+                      }}
                       trigger-placement={popupPosition.value}
-                      {...popupEvent}
-                      onMousedown={(e) => e.preventDefault()}
-                      {...attrs}
+                      onMouseenter={handleMouseEnterWithContext}
+                      onMouseleave={handleMouseLeaveWithContext}
+                      onMousedown={handlePopupMouseDown}
+                      {...popupAttrs.value}
                     >
-                      <div
-                        class={[`${prefixCls}-content`, props.contentClass]}
-                        style={props.contentStyle}
+                      <Transition
+                        name={props.animationName}
+                        duration={props.duration}
+                        appear
+                        onBeforeEnter={onAnimationStart}
+                        onAfterEnter={handleShow}
+                        onBeforeLeave={onAnimationStart}
+                        onAfterLeave={handleHide}
                       >
-                        {slots.content?.()}
-                      </div>
-                      {props.showArrow && (
                         <div
-                          ref={arrowRef}
-                          class={[`${prefixCls}-arrow`, props.arrowClass]}
-                          style={arrowStyle.value}
-                        />
-                      )}
+                          class={`${prefixCls}-popup-wrapper`}
+                          style={transformStyle.value}
+                          v-show={computedVisible.value}
+                        >
+                          <div
+                            class={[`${prefixCls}-content`, props.contentClass]}
+                            style={props.contentStyle}
+                          >
+                            {slots.content?.()}
+                          </div>
+                          {props.showArrow && (
+                            <div
+                              ref={arrowRef}
+                              class={[`${prefixCls}-arrow`, props.arrowClass]}
+                              style={arrowStyle.value}
+                            />
+                          )}
+                        </div>
+                      </Transition>
                     </div>
-                  ) as VNode,
-                  [[vShow, computedVisible.value]]
+                  </ResizeObserver>
                 )}
-            </Transition>
-          </Teleport>
+            </Teleport>
+          </ClientOnly>
         </>
       );
     };

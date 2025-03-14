@@ -29,8 +29,11 @@
         :style="getBtnStyle(computedValue[0])"
         :value="computedValue[0]"
         :direction="direction"
-        :disabled="disabled"
+        :disabled="mergedDisabled"
+        :min="min"
+        :max="max"
         :format-tooltip="formatTooltip"
+        :show-tooltip="showTooltip"
         @movestart="handleMoveStart"
         @moving="handleStartMoving"
         @moveend="handleMoveEnd"
@@ -39,8 +42,11 @@
         :style="getBtnStyle(computedValue[1])"
         :value="computedValue[1]"
         :direction="direction"
-        :disabled="disabled"
+        :disabled="mergedDisabled"
+        :min="min"
+        :max="max"
         :format-tooltip="formatTooltip"
+        :show-tooltip="showTooltip"
         @movestart="handleMoveStart"
         @moving="handleEndMoving"
         @moveend="handleMoveEnd"
@@ -62,7 +68,7 @@
 
 <script lang="ts">
 import type { PropType, CSSProperties } from 'vue';
-import { computed, defineComponent, ref } from 'vue';
+import { computed, defineComponent, ref, toRef, toRefs, watch } from 'vue';
 import NP from 'number-precision';
 import { getPrefixCls } from '../_utils/global-config';
 import SliderButton from './slider-button.vue';
@@ -73,6 +79,7 @@ import SliderInput from './slider-input.vue';
 import { isArray, isUndefined } from '../_utils/is';
 import { Direction, DIRECTIONS } from '../_utils/constant';
 import { getOffsetPercent, getPositionStyle } from './utils';
+import { useFormItem } from '../_hooks/use-form-item';
 
 export default defineComponent({
   name: 'Slider',
@@ -175,42 +182,74 @@ export default defineComponent({
     formatTooltip: {
       type: Function,
     },
-    // for JSX
-    onChange: {
-      type: Function as PropType<(value: number | [number, number]) => void>,
+    /**
+     * @zh 是否显示tooltip
+     * @en Whether to show tooltip
+     * @version 2.42.0
+     */
+    showTooltip: {
+      type: Boolean,
+      default: true,
     },
   },
-  emits: [
-    'update:modelValue',
+  emits: {
+    'update:modelValue': (value: number | [number, number]) => true,
     /**
      * @zh 值改变时触发
      * @en Trigger when the value changes
-     * @property {number | [number, number]} value
+     * @param {number | [number, number]} value
      */
-    'change',
-  ],
+    'change': (value: number | [number, number]) => true,
+  },
   setup(props, { emit }) {
+    const { modelValue } = toRefs(props);
     const prefixCls = getPrefixCls('slider');
+    const { mergedDisabled, eventHandlers } = useFormItem({
+      disabled: toRef(props, 'disabled'),
+    });
 
     const trackRef = ref<HTMLElement | null>(null);
     const trackRect = ref<DOMRect>();
+    const defaultValue = props.modelValue
+      ? props.modelValue
+      : props.defaultValue;
 
-    const startValue = ref(
-      isArray(props.defaultValue) ? props.defaultValue[0] : 0
-    );
+    const startValue = ref(isArray(defaultValue) ? defaultValue[0] : 0);
 
     const endValue = ref(
-      isArray(props.defaultValue) ? props.defaultValue[1] : props.defaultValue
+      isArray(defaultValue) ? defaultValue[1] : defaultValue
     );
+
+    watch(modelValue, (value) => {
+      if (isArray(value)) {
+        startValue.value = value[0] ?? props.min ?? 0;
+        endValue.value = value[1] ?? props.min ?? 0;
+      } else {
+        endValue.value = value ?? props.min ?? 0;
+      }
+    });
+
+    const handleChange = () => {
+      if (props.range) {
+        emit('update:modelValue', [startValue.value, endValue.value]);
+        emit('change', [startValue.value, endValue.value]);
+      } else {
+        emit('update:modelValue', endValue.value);
+        emit('change', endValue.value);
+      }
+      eventHandlers.value?.onChange?.();
+    };
 
     const handleStartChange = (value?: number) => {
       value = value ?? props.min;
       startValue.value = value;
+      handleChange();
     };
 
     const handleEndChange = (value?: number) => {
       value = value ?? props.min;
       endValue.value = value;
+      handleChange();
     };
 
     const computedValue = computed<[number, number]>(() => {
@@ -260,7 +299,7 @@ export default defineComponent({
     // 通过坐标获取value值
     function getValueByCoords(x: number, y: number): number {
       if (!trackRect.value) {
-        return undefined;
+        return 0;
       }
       const { left, top, width, height } = trackRect.value;
       const trackLength = props.direction === 'horizontal' ? width : height;
@@ -276,19 +315,12 @@ export default defineComponent({
     }
 
     const handleEndMoving = (x: number, y: number) => {
-      const value = getValueByCoords(x, y);
-      endValue.value = value;
-      if (props.range) {
-        emit('update:modelValue', [startValue.value, endValue.value]);
-        emit('change', [startValue.value, endValue.value]);
-      } else {
-        emit('update:modelValue', endValue.value);
-        emit('change', endValue.value);
-      }
+      endValue.value = getValueByCoords(x, y);
+      handleChange();
     };
 
     const handleClick = (e: MouseEvent) => {
-      if (props.disabled) {
+      if (mergedDisabled.value) {
         return;
       }
 
@@ -298,15 +330,8 @@ export default defineComponent({
         trackRect.value = trackRef.value.getBoundingClientRect();
       }
 
-      const value = getValueByCoords(clientX, clientY);
-      endValue.value = value;
-      if (props.range) {
-        emit('update:modelValue', [startValue.value, endValue.value]);
-        emit('change', [startValue.value, endValue.value]);
-      } else {
-        emit('update:modelValue', endValue.value);
-        emit('change', endValue.value);
-      }
+      endValue.value = getValueByCoords(clientX, clientY);
+      handleChange();
     };
 
     function getBarStyle([start, end]: [number, number]): CSSProperties {
@@ -331,10 +356,8 @@ export default defineComponent({
     }
 
     const handleStartMoving = (x: number, y: number) => {
-      const value = getValueByCoords(x, y);
-      startValue.value = value;
-      emit('update:modelValue', [startValue.value, endValue.value]);
-      emit('change', [startValue.value, endValue.value]);
+      startValue.value = getValueByCoords(x, y);
+      handleChange();
     };
 
     const handleMoveEnd = () => {
@@ -352,7 +375,7 @@ export default defineComponent({
     const trackCls = computed(() => [
       `${prefixCls}-track`,
       {
-        [`${prefixCls}-track-disabled`]: props.disabled,
+        [`${prefixCls}-track-disabled`]: mergedDisabled.value,
         [`${prefixCls}-track-vertical`]: props.direction === 'vertical',
       },
     ]);
@@ -363,6 +386,7 @@ export default defineComponent({
       trackCls,
       trackRef,
       computedValue,
+      mergedDisabled,
       markList,
       getBtnStyle,
       getBarStyle,

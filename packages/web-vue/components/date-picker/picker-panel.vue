@@ -1,54 +1,84 @@
 <template>
   <div :class="classNames">
-    <PanelShortcuts
-      v-if="showShortcuts && shortcutsPosition === 'left'"
-      v-bind="shortcutsProps"
-    />
+    <PanelShortcuts v-if="showShortcutsInLeft" v-bind="shortcutsProps" />
     <div :class="`${prefixCls}-panel-wrapper`">
-      <WeekPanel
-        v-if="mode === 'week'"
-        v-bind="commonPanelProps"
-        :day-start-of-week="dayStartOfWeek"
-      />
-      <MonthPanel v-else-if="mode === 'month'" v-bind="commonPanelProps" />
-      <YearPanel v-else-if="mode === 'year'" v-bind="commonPanelProps" />
-      <QuarterPanel v-else-if="mode === 'quarter'" v-bind="commonPanelProps" />
-      <DatePanel
-        v-else
-        v-bind="commonPanelProps"
-        mode="date"
-        :show-time="showTime"
-        :time-picker-props="timePickerProps"
-        :day-start-of-week="dayStartOfWeek"
-        :footer-value="footerValue"
-        :time-picker-value="timePickerValue"
-        :disabled-time="disabledTime"
-        @timePickerSelect="onTimePickerSelect"
-      />
-      <PanelFooter
-        :prefix-cls="prefixCls"
-        :show-today-btn="!showTime && mode === 'date'"
-        :show-confirm-btn="showConfirmBtn"
-        :confirm-btn-disabled="confirmBtnDisabled"
-        @todayBtnClick="onTodayBtnClick"
-        @confirmBtnClick="onConfirmBtnClick"
-      >
-        <template v-if="extra" #extra>
-          <RenderFunction :render-func="extra" />
-        </template>
-        <template v-if="showShortcuts && shortcutsPosition === 'bottom'" #btn>
-          <PanelShortcuts v-bind="shortcutsProps" />
-        </template>
-      </PanelFooter>
+      <template v-if="headerMode">
+        <YearPanel
+          v-if="headerMode === 'year'"
+          :header-value="headerPanelHeaderValue"
+          :header-icons="headerIcons"
+          :header-operations="headerPanelHeaderOperations"
+          @select="onHeaderPanelSelect"
+        />
+        <MonthPanel
+          v-else-if="headerMode === 'month'"
+          :header-value="headerPanelHeaderValue"
+          :header-icons="headerIcons"
+          :header-operations="headerPanelHeaderOperations"
+          :abbreviation="abbreviation"
+          @select="onHeaderPanelSelect"
+          @header-label-click="onMonthHeaderLabelClick"
+        />
+      </template>
+      <template v-else>
+        <WeekPanel
+          v-if="mode === 'week'"
+          v-bind="commonPanelProps"
+          :day-start-of-week="dayStartOfWeek"
+        />
+        <MonthPanel
+          v-else-if="mode === 'month'"
+          :abbreviation="abbreviation"
+          v-bind="commonPanelProps"
+        />
+        <YearPanel v-else-if="mode === 'year'" v-bind="commonPanelProps" />
+        <QuarterPanel
+          v-else-if="mode === 'quarter'"
+          v-bind="commonPanelProps"
+        />
+        <DatePanel
+          v-else
+          v-bind="commonPanelProps"
+          mode="date"
+          :show-time="showTime"
+          :time-picker-props="timePickerProps"
+          :day-start-of-week="dayStartOfWeek"
+          :footer-value="footerValue"
+          :time-picker-value="timePickerValue"
+          :disabled-time="disabledTime"
+          @timePickerSelect="onTimePickerSelect"
+        />
+        <PanelFooter
+          :prefix-cls="prefixCls"
+          :show-today-btn="
+            showNowBtn && !(showConfirmBtn || showShortcutsInBottom)
+          "
+          :show-confirm-btn="showConfirmBtn"
+          :confirm-btn-disabled="confirmBtnDisabled"
+          @todayBtnClick="onTodayBtnClick"
+          @confirmBtnClick="onConfirmBtnClick"
+        >
+          <template v-if="extra" #extra>
+            <RenderFunction v-if="extra" :render-func="extra" />
+          </template>
+          <template v-if="showShortcutsInBottom" #btn>
+            <PanelShortcuts v-bind="shortcutsProps" />
+          </template>
+        </PanelFooter>
+      </template>
     </div>
-    <PanelShortcuts
-      v-if="showShortcuts && shortcutsPosition === 'right'"
-      v-bind="shortcutsProps"
-    />
+    <PanelShortcuts v-if="showShortcutsInRight" v-bind="shortcutsProps" />
   </div>
 </template>
 <script lang="ts">
-import { computed, defineComponent, PropType, reactive, toRefs } from 'vue';
+import {
+  computed,
+  defineComponent,
+  PropType,
+  reactive,
+  toRefs,
+  watch,
+} from 'vue';
 import { Dayjs } from 'dayjs';
 import { isFunction } from '../_utils/is';
 import { getDayjsValue, getNow } from '../_utils/date';
@@ -59,6 +89,7 @@ import {
   HeaderIcons,
   HeaderOperations,
   ShortcutType,
+  WeekStart,
 } from './interface';
 import PanelShortcuts from './panels/shortcuts.vue';
 import DatePanel from './panels/date/index.vue';
@@ -69,6 +100,7 @@ import QuarterPanel from './panels/quarter/index.vue';
 import PanelFooter from './panels/footer.vue';
 import { TimePickerProps } from '../time-picker/interface';
 import RenderFunction, { RenderFunc } from '../_components/render-function';
+import useHeaderValue from './hooks/use-header-value';
 
 export default defineComponent({
   name: 'DatePikerPanel',
@@ -85,6 +117,9 @@ export default defineComponent({
   props: {
     mode: {
       type: String,
+    },
+    headerMode: {
+      type: String as PropType<'year' | 'month'>,
     },
     prefixCls: {
       type: String,
@@ -119,7 +154,7 @@ export default defineComponent({
       required: true,
     },
     dayStartOfWeek: {
-      type: Number as PropType<0 | 1>,
+      type: Number as PropType<WeekStart>,
       default: 0,
     },
     disabledDate: {
@@ -153,6 +188,9 @@ export default defineComponent({
     headerOperations: {
       type: Object as PropType<HeaderOperations>,
     },
+    abbreviation: {
+      type: Boolean,
+    },
   },
   emits: [
     'cell-click',
@@ -162,6 +200,9 @@ export default defineComponent({
     'shortcut-mouse-leave',
     'confirm',
     'today-btn-click',
+    'header-label-click',
+    'header-select',
+    'month-header-click',
   ],
   setup(props, { emit }) {
     const {
@@ -178,18 +219,31 @@ export default defineComponent({
       headerValue,
       headerIcons,
       headerOperations,
+      headerMode,
     } = toRefs(props);
 
-    const hasShortcuts = computed(
-      () => shortcuts.value && shortcuts.value.length
+    const hasShortcuts = computed(() =>
+      Boolean(shortcuts.value && shortcuts.value.length)
     );
 
     const showShortcutsNowBtn = computed(
-      () => showConfirmBtn.value && showNowBtn.value && !hasShortcuts.value
+      () => showNowBtn.value && showConfirmBtn.value && !hasShortcuts.value
     );
 
     const showShortcuts = computed(
       () => showShortcutsNowBtn.value || hasShortcuts.value
+    );
+
+    const showShortcutsInLeft = computed(
+      () => showShortcuts.value && shortcutsPosition.value === 'left'
+    );
+
+    const showShortcutsInRight = computed(
+      () => showShortcuts.value && shortcutsPosition.value === 'right'
+    );
+
+    const showShortcutsInBottom = computed(
+      () => showShortcuts.value && shortcutsPosition.value === 'bottom'
     );
 
     const classNames = computed(() => [
@@ -197,13 +251,28 @@ export default defineComponent({
       {
         [`${prefixCls.value}-container-panel-only`]: hideTrigger.value,
         [`${prefixCls.value}-container-shortcuts-placement-left`]:
-          showShortcuts.value && shortcutsPosition.value === 'left',
+          showShortcutsInLeft.value,
         [`${prefixCls.value}-container-shortcuts-placement-right`]:
-          showShortcuts.value && shortcutsPosition.value === 'right',
+          showShortcutsInRight.value,
       },
     ]);
 
     const footerValue = computed(() => value?.value || getNow());
+
+    const {
+      headerValue: headerPanelHeaderValue,
+      setHeaderValue: setHeaderPanelHeaderValue,
+      headerOperations: headerPanelHeaderOperations,
+    } = useHeaderValue(
+      reactive({
+        mode: headerMode,
+        format,
+      })
+    );
+
+    watch(headerValue, (val) => {
+      setHeaderPanelHeaderValue(val);
+    });
 
     function getShortcutValue(shortcut: ShortcutType) {
       const { value } = shortcut;
@@ -238,6 +307,18 @@ export default defineComponent({
       emit('confirm');
     }
 
+    function onPanelHeaderLabelClick(type: 'year' | 'month') {
+      emit('header-label-click', type);
+    }
+
+    function onHeaderPanelSelect(date: Dayjs) {
+      emit('header-select', date);
+    }
+
+    function onMonthHeaderLabelClick() {
+      emit('month-header-click');
+    }
+
     const shortcutsProps = reactive({
       prefixCls,
       shortcuts,
@@ -256,17 +337,24 @@ export default defineComponent({
       disabledDate,
       dateRender,
       onSelect: onPanelSelect,
+      onHeaderLabelClick: onPanelHeaderLabelClick,
     });
 
     return {
       classNames,
-      showShortcuts,
+      showShortcutsInLeft,
+      showShortcutsInRight,
+      showShortcutsInBottom,
       shortcutsProps,
       commonPanelProps,
       footerValue,
       onTodayBtnClick,
       onConfirmBtnClick,
       onTimePickerSelect,
+      onHeaderPanelSelect,
+      headerPanelHeaderValue,
+      headerPanelHeaderOperations,
+      onMonthHeaderLabelClick,
     };
   },
 });

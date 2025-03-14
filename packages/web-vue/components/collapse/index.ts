@@ -2,7 +2,7 @@ import type { App } from 'vue';
 import type { ArcoOptions } from '../_utils/types';
 import { setGlobalConfig, getComponentPrefix } from '../_utils/global-config';
 import _Collapse from './collapse.vue';
-import _CollapseItem from './collapse-item.vue';
+import _CollapseItem from './collapse-item';
 
 const Collapse = Object.assign(_Collapse, {
   Item: _CollapseItem,
@@ -17,5 +17,7 @@ const Collapse = Object.assign(_Collapse, {
 
 export type CollapseInstance = InstanceType<typeof _Collapse>;
 export type CollapseItemInstance = InstanceType<typeof _CollapseItem>;
+
+export { _CollapseItem as CollapseItem };
 
 export default Collapse;

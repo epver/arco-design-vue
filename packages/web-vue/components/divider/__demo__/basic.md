@@ -22,9 +22,9 @@ It divides the text paragraphs of different chapters, the default is a horizonta
     <p>A design is a plan or specification for the construction of an object.</p>
     <a-divider />
     <p>A design is a plan or specification for the construction of an object.</p>
-    <a-divider style="border-bottom-style: dashed" />
+    <a-divider dashed />
     <p>A design is a plan or specification for the construction of an object.</p>
-    <a-divider style="border-bottom-width: 2px; border-bottom-style: dotted" />
+    <a-divider :size="2" style="border-bottom-style: dotted" />
     <p>A design is a plan or specification for the construction of an object.</p>
   </div>
   <div class="divider-demo" style="marginTop: 48px">
@@ -53,6 +53,7 @@ It divides the text paragraphs of different chapters, the default is a horizonta
     </div>
   </div>
 </template>
+
 <script>
 import {
   IconImage,
@@ -68,6 +69,7 @@ export default {
   },
 };
 </script>
+
 <style scoped>
 .divider-demo {
   box-sizing: border-box;

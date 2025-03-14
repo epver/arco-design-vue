@@ -30,7 +30,7 @@ export default defineComponent({
      * @vModel
      */
     activeKey: {
-      type: Array as PropType<string[]>,
+      type: Array as PropType<(string | number)[]>,
       default: undefined,
     },
     /**
@@ -38,7 +38,7 @@ export default defineComponent({
      * @en The `key` of the panel expanded by default (uncontrolled mode)
      */
     defaultActiveKey: {
-      type: Array as PropType<string[]>,
+      type: Array as PropType<(string | number)[]>,
       default: () => [],
     },
     /**
@@ -48,6 +48,15 @@ export default defineComponent({
     accordion: {
       type: Boolean,
       default: false,
+    },
+    /**
+     * @zh 是否显示展开图标
+     * @en Whether to show the expand icon
+     * @version 2.33.0
+     */
+    showExpandIcon: {
+      type: Boolean,
+      default: undefined,
     },
     /**
      * @zh 展开图标显示的位置
@@ -66,22 +75,38 @@ export default defineComponent({
       type: Boolean,
       default: true,
     },
-    // for JSX
-    onChange: {
-      type: Function as PropType<(activeKey: string | string[]) => void>,
+    /**
+     * @zh 是否在隐藏时销毁内容
+     * @en Whether to destroy content when hidden
+     * @version 2.27.0
+     */
+    destroyOnHide: {
+      type: Boolean,
+      default: false,
     },
   },
-  emits: [
-    'update:activeKey',
+  /**
+   * @zh 展开图标
+   * @en Expand icon
+   * @slot expand-icon
+   * @binding {boolean} active
+   * @binding {boolean} disabled
+   * @binding {'left' | 'right'} position
+   * @version 2.33.0
+   */
+  emits: {
+    'update:activeKey': (activeKey: (string | number)[]) => true,
     /**
      * @zh 展开的面板发生改变时触发
      * @en Emitted when the expanded panel changes
+     * @param {(string | number)[]} activeKey
+     * @param {Event} ev
      */
-    'change',
-  ],
-  setup(props, { emit }) {
+    'change': (activeKey: (string | number)[], ev: Event) => true,
+  },
+  setup(props, { emit, slots }) {
+    const { expandIconPosition, destroyOnHide, showExpandIcon } = toRefs(props);
     const prefixCls = getPrefixCls('collapse');
-    const { expandIconPosition } = toRefs(props);
 
     const _activeKey = ref(props.defaultActiveKey);
     const computedActiveKeys = computed(() => {
@@ -92,23 +117,16 @@ export default defineComponent({
       return activeKey;
     });
 
-    const handleClick = (key: string, e: Event) => {
+    const handleClick = (key: string | number, e: Event) => {
+      let newActiveKeys: (string | number)[] = [];
       if (props.accordion) {
-        if (computedActiveKeys.value.includes(key)) {
-          const newActiveKeys: string[] = [];
-          _activeKey.value = newActiveKeys;
-          emit('update:activeKey', newActiveKeys);
-          emit('change', newActiveKeys, e);
-        } else {
-          const newActiveKeys = [key];
-          _activeKey.value = newActiveKeys;
-          emit('update:activeKey', newActiveKeys);
-          emit('change', newActiveKeys, e);
+        if (!computedActiveKeys.value.includes(key)) {
+          newActiveKeys = [key];
         }
+        _activeKey.value = newActiveKeys;
       } else {
-        let newActiveKeys = [...computedActiveKeys.value];
+        newActiveKeys = [...computedActiveKeys.value];
         const _index = newActiveKeys.indexOf(key);
-
         if (_index > -1) {
           newActiveKeys.splice(_index, 1);
         } else if (props.accordion) {
@@ -116,18 +134,20 @@ export default defineComponent({
         } else {
           newActiveKeys.push(key);
         }
-
         _activeKey.value = newActiveKeys;
-        emit('update:activeKey', newActiveKeys);
-        emit('change', newActiveKeys, e);
       }
+      emit('update:activeKey', newActiveKeys);
+      emit('change', newActiveKeys, e);
     };
 
     provide(
       collapseKey,
       reactive({
         activeKeys: computedActiveKeys,
+        slots,
+        showExpandIcon,
         expandIconPosition,
+        destroyOnHide,
         handleClick,
       })
     );

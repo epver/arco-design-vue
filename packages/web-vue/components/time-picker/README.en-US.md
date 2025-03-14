@@ -32,6 +32,8 @@ description: Select the time on the pop-up panel to conveniently complete the ti
 
 @import ./__demo__/use-12-hours.md
 
+## API
+
 
 ### `<time-picker>` Props
 
@@ -45,7 +47,7 @@ description: Select the time on the pop-up panel to conveniently complete the ti
 |readonly|Whether it is read-only mode|`boolean`|`false`|
 |error|Whether it is an error state|`boolean`|`false`|
 |format|Display the format of the date, refer to [String Parsing Format](#String Parsing Format)|`string`|`'HH:mm:ss'`|
-|placeholder|Prompt copy|`string`|`-`|
+|placeholder|Prompt copy|`string \| string[]`|`-`|
 |size|Input box size|`'mini' \| 'small' \| 'medium' \| 'large'`|`'medium'`|
 |popup-container|Mount container for pop-up box|`string \| HTMLElement`|`-`|
 |use12-hours|12 hour clock|`boolean`|`false`|
@@ -58,7 +60,7 @@ description: Select the time on the pop-up panel to conveniently complete the ti
 |position|Pop-up position|`'top' \| 'tl' \| 'tr' \| 'bottom' \| 'bl' \| 'br'`|`'bl'`|
 |popup-visible **(v-model)**|Control the pop-up box to open or close|`boolean`|`-`|
 |default-popup-visible|The pop-up box is opened or closed by default|`boolean`|`false`|
-|trigger-props|You can pass in the parameters of the `Trigger` component|`Record<string, unknown>`|`-`|
+|trigger-props|You can pass in the parameters of the `Trigger` component|`TriggerProps`|`-`|
 |unmount-on-close|Whether to destroy the dom structure after closing|`boolean`|`false`|
 ### `<time-picker>` Events
 
@@ -70,9 +72,11 @@ description: Select the time on the pop-up panel to conveniently complete the ti
 |popup-visible-change|Pop-up box expand and collapse|visible: `boolean`|
 ### `<time-picker>` Slots
 
-|Slot Name|Description|Parameters|
-|---|---|---|
-|extra|Extra footer|-|
+|Slot Name|Description|Parameters|version|
+|---|---|---|:---|
+|prefix|Input box prefix|-|2.41.0|
+|suffix-icon|Input box suffix icon|-||
+|extra|Extra footer|-||
 
 
 

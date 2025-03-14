@@ -1,5 +1,5 @@
 <template>
-  <div :class="cls">
+  <div role="listitem" :class="cls">
     <div :class="`${prefixCls}-dot-wrapper`">
       <div :class="dotLineCls" :style="computedDotLineStyle" />
       <div :class="`${prefixCls}-dot-content`">
@@ -14,11 +14,13 @@
         <slot />
       </div>
       <div v-if="labelPosition !== 'relative'" :class="`${prefixCls}-label`">
-        {{ label }}
+        <slot v-if="$slots.label" name="label" />
+        <template v-else>{{ label }}</template>
       </div>
     </div>
     <div v-if="labelPosition === 'relative'" :class="`${prefixCls}-label`">
-      {{ label }}
+      <slot v-if="$slots.label" name="label" />
+      <template v-else>{{ label }}</template>
     </div>
   </div>
 </template>
@@ -27,29 +29,19 @@
 import {
   defineComponent,
   getCurrentInstance,
-  onMounted,
-  onUnmounted,
   inject,
   computed,
   PropType,
 } from 'vue';
 import { getPrefixCls } from '../_utils/global-config';
-import { timelineInjectionKey } from './context';
-import {
-  DOTS,
-  DotType,
-  LineType,
-  LINES,
-  PositionType,
-  POSITIONS,
-  ModeType,
-} from './constants';
-import { DirectionType } from '../carousel/constants';
+import { TimelineContext, timelineInjectionKey } from './context';
+import { DotType, LineType, PositionType, ModeType } from './interface';
+import { Direction } from '../_utils/constant';
 
 const getDefaultPosition = (
   index: number,
   mode: ModeType,
-  direction: DirectionType,
+  direction: Direction,
   position?: string
 ) => {
   let map = ['left', 'right'];
@@ -78,9 +70,6 @@ export default defineComponent({
      */
     dotType: {
       type: String as PropType<DotType>,
-      validator: (value: DotType) => {
-        return DOTS.includes(value);
-      },
       default: 'solid',
     },
     /**
@@ -90,9 +79,6 @@ export default defineComponent({
      */
     lineType: {
       type: String as PropType<LineType>,
-      validator: (value: LineType) => {
-        return LINES.includes(value);
-      },
       default: 'solid',
     },
     /**
@@ -115,9 +101,6 @@ export default defineComponent({
      */
     position: {
       type: String as PropType<PositionType>,
-      validator: (value: PositionType) => {
-        return POSITIONS.includes(value);
-      },
     },
   },
   /**
@@ -125,42 +108,34 @@ export default defineComponent({
    * @en Custom dot
    * @slot dot
    */
+  /**
+   * @zh 自定义标签
+   * @en Custom label
+   * @slot label
+   * @version 2.50.0
+   */
   setup(props) {
     const prefixCls = getPrefixCls('timeline-item');
     const instance = getCurrentInstance();
-    const context = inject(timelineInjectionKey, undefined);
-    onMounted(() => {
-      if (context?.addItem) {
-        context.addItem({
-          uid: instance!.uid,
-        });
-      }
-    });
-    onUnmounted(() => {
-      if (context?.removeItem) {
-        context.removeItem(instance!.uid);
-      }
-    });
-    const myIndexRef = computed(() => {
-      const items = context?.items || [];
-      const index = items.findIndex((it) => it.uid === instance?.uid);
-      return index;
-    });
+    const context = inject<Partial<TimelineContext>>(timelineInjectionKey, {});
+
+    const index = computed(
+      () => context.items?.indexOf(instance?.uid ?? -1) ?? -1
+    );
 
     const contextDirection = computed(() => {
-      return context?.direction;
+      return context?.direction ?? 'vertical';
     });
 
     const contextLabelPosition = computed(() => {
-      return context?.labelPosition;
+      return context?.labelPosition ?? 'same';
     });
 
     const cls = computed(() => {
-      const index = myIndexRef.value;
-      const { items = [], reverse, labelPosition, mode } = context! || {};
+      const { items = [], reverse, labelPosition, mode = 'left' } = context;
       const direction = contextDirection.value;
       const computedPosition = getDefaultPosition(
-        index,
+        index.value,
         mode,
         direction,
         props.position
@@ -171,7 +146,7 @@ export default defineComponent({
           [`${prefixCls}-${direction}-${computedPosition}`]: direction,
           [`${prefixCls}-label-${labelPosition}`]: labelPosition,
           [`${prefixCls}-last`]:
-            index === (reverse === true ? 0 : items.length - 1),
+            index.value === (reverse === true ? 0 : items.length - 1),
         },
       ];
     });

@@ -16,12 +16,41 @@ description: 页面的基础布局框架，常与组件嵌套使用，构建页�
 
 @import ./__demo__/resize.md
 
+## API
+
 
 ### `<layout>` Props
 
 |参数名|描述|类型|默认值|
 |---|---|---|:---:|
 |has-sider|表示子元素里有 Sider，一般不用指定。可用于服务端渲染时避免样式闪动|`boolean`|`false`|
+
+
+
+
+### `<layout-header>` Slots
+
+|插槽名|描述|参数|
+|---|:---:|---|
+|default|内容|-|
+
+
+
+
+### `<layout-content>` Slots
+
+|插槽名|描述|参数|
+|---|:---:|---|
+|default|内容|-|
+
+
+
+
+### `<layout-footer>` Slots
+
+|插槽名|描述|参数|
+|---|:---:|---|
+|default|内容|-|
 
 
 

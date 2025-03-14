@@ -1,7 +1,7 @@
 <template>
   <Trigger
-    trigger="click"
-    :class="tirggerClassNames"
+    trigger="hover"
+    :class="triggerClassNames"
     :position="needPopOnBottom ? 'bl' : 'rt'"
     show-arrow
     animation-class="fade-in"
@@ -11,13 +11,34 @@
     :auto-fit-popup-min-width="true"
     :duration="100"
     v-bind="triggerProps"
+    :unmount-on-close="false"
     :popup-visible="popVisible"
     @popupVisibleChange="onVisibleChange"
   >
-    <div :class="classNames" v-bind="attrs" @click="onClick">
+    <div
+      :class="[
+        classNames,
+        {
+          [`${menuPrefixCls}-has-icon`]: $slots.icon,
+        },
+      ]"
+      aria-haspopup="true"
+      v-bind="$attrs"
+      @click="onClick"
+    >
       <!-- header -->
       <MenuIndent :level="level" />
-      <slot name="title">{{ title }}</slot>
+      <template v-if="$slots.icon">
+        <span :class="`${menuPrefixCls}-icon`">
+          <slot name="icon"></slot>
+        </span>
+        <span :class="`${menuPrefixCls}-title`">
+          <slot name="title">{{ title }}</slot>
+        </span>
+      </template>
+      <template v-else>
+        <slot name="title">{{ title }}</slot>
+      </template>
       <!-- suffix -->
       <span :class="`${menuPrefixCls}-icon-suffix`">
         <slot v-if="needPopOnBottom" name="expand-icon-down" />
@@ -36,10 +57,11 @@
         :selected-keys="selectedKeys"
         :theme="menuContext.theme"
         :trigger-props="menuContext.triggerProps"
+        :style="popupMenuStyles"
         @menuItemClick="onMenuItemClick"
       >
         <slot />
-        <template v-if="menuContext.expandIconDown" #expand-icon-dowm>
+        <template v-if="menuContext.expandIconDown" #expand-icon-down>
           <RenderFunction :render-func="menuContext.expandIconDown" />
         </template>
         <template v-if="menuContext.expandIconRight" #expand-icon-right>
@@ -59,10 +81,10 @@ import useMenu from './hooks/use-menu';
 import useLevel from './hooks/use-level';
 import { omit } from '../_utils/omit';
 import { getPrefixCls } from '../_utils/global-config';
-import { isChildrenSelected } from './utils';
 import MenuIndent from './indent.vue';
 import useMenuContext from './hooks/use-menu-context';
 import RenderFunction from '../_components/render-function';
+import { isNumber } from '../_utils/is';
 
 export default defineComponent({
   name: 'SubMenuPop',
@@ -80,11 +102,18 @@ export default defineComponent({
     selectable: {
       type: Boolean,
     },
+    isChildrenSelected: {
+      type: Boolean,
+    },
+    popupMaxHeight: {
+      type: [Boolean, Number],
+      default: undefined,
+    },
   },
-  setup(props: SubMenuPopProps, { attrs, slots }) {
+  setup(props) {
     const { key } = useMenu();
     const { level } = useLevel();
-    const { selectable } = toRefs(props);
+    const { selectable, isChildrenSelected, popupMaxHeight } = toRefs(props);
     const menuContext = useMenuContext();
     const { onSubMenuClick, onMenuItemClick } = menuContext;
 
@@ -96,7 +125,7 @@ export default defineComponent({
     const isSelected = computed(
       () =>
         (selectable.value && selectedKeys.value.includes(key.value)) ||
-        isChildrenSelected(slots.default?.(), selectedKeys.value)
+        isChildrenSelected.value
     );
     const classNames = computed(() => [
       `${prefixCls.value}`,
@@ -113,16 +142,19 @@ export default defineComponent({
       popVisible.value = val;
     };
     const triggerPrefixCls = getPrefixCls('trigger');
-    const tirggerClassNames = computed(() => [
+    const triggerClassNames = computed(() => [
       `${prefixCls.value}-trigger`,
-      menuContext.triggerProps?.value?.class,
+      {
+        [`${prefixCls.value}-trigger-dark`]: menuContext.theme === 'dark',
+      },
+      // @ts-ignore
+      menuContext.triggerProps?.class,
     ]);
     const triggerProps = computed(() =>
-      omit(menuContext.triggerProps?.value || {}, ['class'])
+      omit(menuContext.triggerProps || {}, ['class'])
     );
 
     return {
-      attrs,
       menuPrefixCls,
       mode,
       level,
@@ -132,9 +164,14 @@ export default defineComponent({
       needPopOnBottom,
       popVisible,
       triggerPrefixCls,
-      tirggerClassNames,
+      triggerClassNames,
       triggerProps,
       menuContext,
+      popupMenuStyles: computed(() => {
+        const maxHeight = popupMaxHeight.value ?? menuContext.popupMaxHeight;
+        if (isNumber(maxHeight)) return { maxHeight: `${maxHeight}px` };
+        return maxHeight ? {} : { maxHeight: 'unset' };
+      }),
       onClick: () => {
         onSubMenuClick && onSubMenuClick(key.value, level.value);
         selectable.value && onMenuItemClick && onMenuItemClick(key.value);

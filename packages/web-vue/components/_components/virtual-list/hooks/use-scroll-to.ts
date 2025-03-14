@@ -6,16 +6,12 @@ import {
   getItemRelativeTop,
   getCompareItemRelativeTop,
 } from '../utils';
-import { InternalDataItem, Key } from '../interface';
+import { InternalDataItem, VirtualItemKey, ScrollOptions } from '../interface';
 
 export interface RelativeScroll {
   itemIndex: number;
   relativeTop: number;
 }
-
-export type ScrollOptions =
-  | number
-  | { index?: number; key?: Key; align?: 'auto' | 'top' | 'bottom' };
 
 export function useScrollTo(props: {
   isVirtual: boolean;
@@ -30,7 +26,7 @@ export function useScrollTo(props: {
   };
   scrollTop: number;
   visibleCount: number;
-  getItemHeightOrDefault: (key: Key) => number;
+  getItemHeightOrDefault: (key: VirtualItemKey) => number;
   getItemHeightOrDefaultByIndex: (index: number) => number;
 }) {
   const {

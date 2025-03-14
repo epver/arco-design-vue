@@ -1,8 +1,12 @@
-import type { InjectionKey } from 'vue';
+import { InjectionKey } from 'vue';
 
 export interface DropdownContext {
-  onClickOption: (value: string | number) => void;
+  popupMaxHeight: boolean | number;
+  onOptionClick: (
+    value: string | number | Record<string, unknown> | undefined,
+    ev: Event
+  ) => void;
 }
 
-export const dropdownKey: InjectionKey<DropdownContext> =
+export const dropdownInjectionKey: InjectionKey<DropdownContext> =
   Symbol('ArcoDropdown');

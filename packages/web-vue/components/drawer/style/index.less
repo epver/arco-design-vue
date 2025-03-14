@@ -12,12 +12,12 @@
 }
 
 .@{drawer-prefix-cls}-mask {
-  position: fixed;
+  position: absolute;
   top: 0;
   right: 0;
   bottom: 0;
   left: 0;
-  background-color: var(--color-mask-bg);
+  background-color: var(~'@{arco-cssvars-prefix}-color-mask-bg');
 }
 
 .@{drawer-prefix-cls} {
@@ -28,7 +28,7 @@
   height: 100%;
   overflow: auto;
   line-height: @line-height-base;
-  background-color: var(--color-bg-3);
+  background-color: var(~'@{arco-cssvars-prefix}-color-bg-3');
 
   &-header {
     display: flex;
@@ -41,18 +41,15 @@
     border-bottom: @border-1 solid @drawer-color-border;
 
     .@{drawer-prefix-cls}-title {
+      margin-right: auto;
       color: @drawer-color-header-text;
-      font-weight: @font-weight-500;
+      font-weight: @drawer-font-header-weight;
       font-size: @drawer-font-header-size;
       text-align: left;
     }
 
     .@{drawer-prefix-cls}-close-btn {
-      position: absolute;
-      top: ((@drawer-size-header-height - @drawer-font-size-close-icon) / 2);
-      right: @drawer-position-close-icon-right +
-        ((@icon-hover-size-default-height - @drawer-font-size-close-icon) / 2);
-      z-index: 1;
+      margin-left: 8px;
       color: @drawer-color-header-text;
       font-size: @drawer-font-size-close-icon;
       cursor: pointer;

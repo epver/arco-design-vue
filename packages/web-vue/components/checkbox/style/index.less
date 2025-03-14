@@ -5,7 +5,8 @@
 
 .@{checkbox-prefix-cls} {
   position: relative;
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
   box-sizing: border-box;
   padding-left: (@checkbox-mask-bg-height / 2) - (@checkbox-mask-height / 2);
   font-size: @checkbox-text-font-size;
@@ -20,7 +21,7 @@
     height: 0;
     opacity: 0;
 
-    &:focus + .@{checkbox-prefix-cls}-icon-hover::before {
+    &:focus-visible + .@{checkbox-prefix-cls}-icon-hover::before {
       background-color: @icon-hover-color-bg;
     }
   }
@@ -34,13 +35,6 @@
   &-label {
     margin-left: @checkbox-text-mask-spacing;
     color: @checkbox-color-text;
-  }
-
-  &-icon-hover {
-    position: relative;
-    top: -0.09em;
-    line-height: 1;
-    vertical-align: middle;
   }
 
   &-icon {
@@ -155,6 +149,10 @@
     }
   }
 
+  &-disabled:hover &-icon {
+    border-color: @checkbox-mask-color-border;
+  }
+
   &-disabled &-label {
     color: @checkbox-color-text_disabled;
   }
@@ -177,7 +175,7 @@
 
 .@{checkbox-prefix-cls}-group-direction-vertical {
   .@{checkbox-prefix-cls} {
-    display: block;
+    display: flex;
     margin-right: 0;
     line-height: @checkbox-group-size-line-height_vertical;
   }

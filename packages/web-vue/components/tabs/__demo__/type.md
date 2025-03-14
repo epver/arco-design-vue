@@ -17,6 +17,7 @@ The type of label can be set by `type`.
 ---
 
 ```vue
+
 <template>
   <a-space direction="vertical" size="large">
     <a-radio-group v-model="type" type="button">
@@ -27,7 +28,13 @@ The type of label can be set by `type`.
       <a-radio value="rounded">Rounded</a-radio>
       <a-radio value="capsule">Capsule</a-radio>
     </a-radio-group>
-    <a-tabs :type="type">
+    <a-radio-group v-model="size" type="button">
+      <a-radio value="mini">Mini</a-radio>
+      <a-radio value="small">Small</a-radio>
+      <a-radio value="medium">Medium</a-radio>
+      <a-radio value="large">Large</a-radio>
+    </a-radio-group>
+    <a-tabs :type="type" :size="size">
       <a-tab-pane key="1" title="Tab 1">
         Content of Tab Panel 1
       </a-tab-pane>
@@ -42,12 +49,18 @@ The type of label can be set by `type`.
 </template>
 
 <script>
+import { ref } from 'vue';
+
 export default {
-  data() {
+  setup() {
+    const type = ref('line');
+    const size = ref('medium');
+
     return {
-      type:'line'
+      type,
+      size
     }
-  }
+  },
 }
 </script>
 ```

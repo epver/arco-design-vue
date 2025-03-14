@@ -8,6 +8,9 @@
         }"
         :prefix-cls="pickerPrefixCls"
         :title="headerTitle"
+        :mode="mode"
+        :value="headerValue"
+        :on-label-click="onHeaderLabelClick"
       />
       <PanelWeekList :prefix-cls="pickerPrefixCls" :week-list="weekList" />
       <PanelBody
@@ -24,7 +27,9 @@
       />
     </div>
     <div v-if="showTimeView" :class="`${prefixCls}-timepicker`">
-      <header :class="`${prefixCls}-timepicker-title`">选择时间</header>
+      <header :class="`${prefixCls}-timepicker-title`">{{
+        datePickerT('datePicker.selectTime')
+      }}</header>
       <TimePanel
         v-bind="{
           ...timePickerProps,
@@ -82,15 +87,17 @@ import type {
   HeaderOperations,
   IsSameTime,
   Mode,
+  WeekStart,
 } from '../../interface';
 import { newArray } from '../../utils';
-import PanelHeader from '../header.vue';
+import PanelHeader, { HeaderLabelClickFunc } from '../header.vue';
 import PanelBody from '../body.vue';
 import PanelWeekList from '../week-list.vue';
 import TimePanel from '../../../time-picker/panel.vue';
 import IconCalendar from '../../../icon/icon-calendar';
 import IconClockCircle from '../../../icon/icon-clock-circle';
 import useMergeState from '../../../_hooks/use-merge-state';
+import useDatePickerTransform from '../../hooks/use-inject-datepicker-transform';
 
 const ROW_COUNT = 6;
 const COL_COUNT = 7;
@@ -142,7 +149,7 @@ export default defineComponent({
       default: () => ({}),
     },
     dayStartOfWeek: {
-      type: Number as PropType<0 | 1>,
+      type: Number as PropType<WeekStart>,
       default: 0,
     },
     disabledDate: {
@@ -173,6 +180,9 @@ export default defineComponent({
     disabled: {
       type: Boolean,
     },
+    onHeaderLabelClick: {
+      type: Function as PropType<HeaderLabelClickFunc>,
+    },
   },
   emits: [
     'select',
@@ -193,6 +203,8 @@ export default defineComponent({
       currentView,
       disabledTime,
     } = toRefs(props);
+
+    const datePickerT = useDatePickerTransform();
 
     const isWeek = computed(() => mode?.value === 'week');
 
@@ -240,9 +252,11 @@ export default defineComponent({
         {}
     );
 
-    const weekList = computed(() =>
-      dayStartOfWeek.value === 1 ? [1, 2, 3, 4, 5, 6, 0] : [0, 1, 2, 3, 4, 5, 6]
-    );
+    const weekList = computed(() => {
+      const list = [0, 1, 2, 3, 4, 5, 6];
+      const index = Math.max(dayStartOfWeek.value % 7, 0);
+      return [...list.slice(index), ...list.slice(0, index)];
+    });
 
     const rows = computed(() => {
       const startDate = methods.startOf(headerValue.value, 'month');
@@ -317,6 +331,7 @@ export default defineComponent({
         emit('update:currentView', newView);
         setLocalCurrentView(newView);
       },
+      datePickerT,
     };
   },
 });

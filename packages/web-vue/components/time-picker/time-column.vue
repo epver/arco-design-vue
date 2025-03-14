@@ -53,7 +53,7 @@ export default defineComponent({
       required: true,
     },
     value: {
-      type: Number,
+      type: [Number, String],
     },
     visible: {
       type: Boolean,

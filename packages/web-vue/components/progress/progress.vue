@@ -5,22 +5,33 @@
       :stroke-width="strokeWidth"
       :percent="percent"
       :color="color"
+      :track-color="trackColor"
       :width="width"
       :steps="steps"
-      :size="size"
+      :size="mergedSize"
       :show-text="showText"
-    />
+    >
+      <template v-if="$slots.text" #text="scope">
+        <slot name="text" v-bind="scope"></slot>
+      </template>
+    </progress-steps>
     <progress-line
-      v-else-if="type === 'line' && size !== 'mini'"
+      v-else-if="type === 'line' && mergedSize !== 'mini'"
       :stroke-width="strokeWidth"
       :animation="animation"
       :percent="percent"
       :color="color"
-      :size="size"
+      :track-color="trackColor"
+      :size="mergedSize"
       :buffer-color="bufferColor"
       :width="width"
       :show-text="showText"
-    />
+      :status="computedStatus"
+    >
+      <template v-if="$slots.text" #text="scope">
+        <slot name="text" v-bind="scope"></slot>
+      </template>
+    </progress-line>
     <progress-circle
       v-else
       :type="type"
@@ -29,19 +40,26 @@
       :width="width"
       :percent="percent"
       :color="color"
-      :size="size"
+      :track-color="trackColor"
+      :size="mergedSize"
       :show-text="showText"
-    />
+      :status="computedStatus"
+    >
+      <template v-if="$slots.text" #text="scope">
+        <slot name="text" v-bind="scope"></slot>
+      </template>
+    </progress-circle>
   </div>
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, PropType } from 'vue';
+import { computed, defineComponent, PropType, toRefs } from 'vue';
 import ProgressLine from './line.vue';
 import ProgressCircle from './circle.vue';
 import ProgressSteps from './steps.vue';
 import { Size, Status } from '../_utils/constant';
 import { getPrefixCls } from '../_utils/global-config';
+import { useSize } from '../_hooks/use-size';
 
 const PROGRESS_TYPES = ['line', 'circle'] as const;
 type ProgressType = typeof PROGRESS_TYPES[number];
@@ -66,11 +84,11 @@ export default defineComponent({
     /**
      * @zh 进度条的大小
      * @en The size of the progress bar
-     * @values 'mini', 'small', 'medium', 'large'
+     * @values 'mini','small','medium','large'
+     * @defaultValue 'medium'
      */
     size: {
       type: String as PropType<Size>,
-      default: 'medium',
     },
     /**
      * @zh 进度条当前的百分比
@@ -118,12 +136,14 @@ export default defineComponent({
       type: [String, Object],
     },
     /**
-     * @zh 进度条缓冲区的颜色
-     * @en The color of the progress bar buffer
+     * @zh 进度条的轨道颜色
+     * @en The color of the progress track
      */
+    trackColor: String,
     bufferColor: {
       type: [String, Object],
     },
+
     /**
      * @zh 是否显示文字
      * @en Whether to display text
@@ -139,22 +159,33 @@ export default defineComponent({
      */
     status: {
       type: String as PropType<Status>,
-      default: 'normal',
     },
+    /**
+     * @zh 文本
+     * @en Text
+     * @slot text
+     */
   },
   setup(props) {
     const prefixCls = getPrefixCls('progress');
+    const { size } = toRefs(props);
     const type = computed(() => (props.steps > 0 ? 'steps' : props.type));
+    const computedStatus = computed(() => {
+      return props.status || (props.percent >= 1 ? 'success' : 'normal');
+    });
+    const { mergedSize } = useSize(size);
 
     const cls = computed(() => [
       prefixCls,
       `${prefixCls}-type-${type.value}`,
-      `${prefixCls}-size-${props.size}`,
-      `${prefixCls}-status-${props.status}`,
+      `${prefixCls}-size-${mergedSize.value}`,
+      `${prefixCls}-status-${computedStatus.value}`,
     ]);
 
     return {
       cls,
+      computedStatus,
+      mergedSize,
     };
   },
 });

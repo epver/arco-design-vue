@@ -39,14 +39,14 @@ Shows how to use form validation.
       <a-input-number v-model="form.age" placeholder="please enter your age..." />
     </a-form-item>
     <a-form-item field="section" label="Section" :rules="[{match:/section one/,message:'must select one'}]">
-      <a-select v-model="form.section" placeholder="Please select ...">
+      <a-select v-model="form.section" placeholder="Please select ..." allow-clear>
         <a-option value="section one">Section One</a-option>
         <a-option value="section two">Section Two</a-option>
         <a-option value="section three">Section Three</a-option>
       </a-select>
     </a-form-item>
-    <a-form-item field="province" label="Province">
-      <a-cascader v-model="form.province" :options="options" placeholder="Please select ..." />
+    <a-form-item field="province" label="Province" :rules="[{required:true,message:'province is required'}]">
+      <a-cascader v-model="form.province" :options="options" placeholder="Please select ..." allow-clear />
     </a-form-item>
     <a-form-item field="options" label="Options"
                  :rules="[{type:'array',minLength:2,message:'must select greater than two options'}]"
@@ -60,6 +60,9 @@ Shows how to use form validation.
     </a-form-item>
     <a-form-item field="date" label="Date">
       <a-date-picker v-model="form.date" placeholder="Please select ..."/>
+    </a-form-item>
+    <a-form-item field="time" label="Time">
+      <a-time-picker v-model="form.time" placeholder="Please select ..."/>
     </a-form-item>
     <a-form-item field="radio" label="Radio" :rules="[{match:/one/,message:'must select one'}]">
       <a-radio-group v-model="form.radio">
@@ -97,103 +100,110 @@ Shows how to use form validation.
 </template>
 
 <script>
+import { reactive } from 'vue';
+
 export default {
-  data() {
-    return {
-      form: {
-        size: 'medium',
-        name: '',
-        age: undefined,
-        section: '',
-        province: 'haidian',
-        options: [],
-        date:'',
-        radio: 'radio one',
-        slider: 5,
-        score: 5,
-        switch: false,
-        multiSelect: ['section one'],
-        treeSelect: ''
-      },
-      options: [
-        {
-          value: 'beijing',
-          label: 'Beijing',
-          children: [
-            {
-              value: 'chaoyang',
-              label: 'ChaoYang',
-              children: [
-                {
-                  value: 'datunli',
-                  label: 'Datunli',
-                },
-              ],
-            },
-            {
-              value: 'haidian',
-              label: 'Haidian',
-            },
-            {
-              value: 'dongcheng',
-              label: 'Dongcheng',
-            },
-            {
-              value: 'xicheng',
-              label: 'XiCheng',
-            },
-          ],
-        },
-        {
-          value: 'shanghai',
-          label: 'Shanghai',
-          children: [
-            {
-              value: 'shanghaishi',
-              label: 'Shanghai',
-              children: [
-                {
-                  value: 'huangpu',
-                  label: 'Huangpu',
-                },
-              ],
-            },
-          ],
-        },
-      ],
-      treeData: [
-        {
-          key: 'node1',
-          title: 'Node1',
-          children: [
-            {
-              key: 'node2',
-              title: 'Node2',
-            },
-          ],
-        },
-        {
-          key: 'node3',
-          title: 'Node3',
-          children: [
-            {
-              key: 'node4',
-              title: 'Node4',
-            },
-            {
-              key: 'node5',
-              title: 'Node5',
-            },
-          ],
-        },
-      ]
-    }
-  },
-  methods: {
-    handleSubmit({ values, errors }) {
+  setup() {
+    const handleSubmit = ({values, errors}) => {
       console.log('values:', values, '\nerrors:', errors)
     }
-  }
+
+    const form = reactive({
+      size: 'medium',
+      name: '',
+      age: undefined,
+      section: '',
+      province: 'haidian',
+      options: [],
+      date: '',
+      time: '',
+      radio: 'radio one',
+      slider: 5,
+      score: 5,
+      switch: false,
+      multiSelect: ['section one'],
+      treeSelect: ''
+    });
+    const options = [
+      {
+        value: 'beijing',
+        label: 'Beijing',
+        children: [
+          {
+            value: 'chaoyang',
+            label: 'ChaoYang',
+            children: [
+              {
+                value: 'datunli',
+                label: 'Datunli',
+              },
+            ],
+          },
+          {
+            value: 'haidian',
+            label: 'Haidian',
+          },
+          {
+            value: 'dongcheng',
+            label: 'Dongcheng',
+          },
+          {
+            value: 'xicheng',
+            label: 'XiCheng',
+          },
+        ],
+      },
+      {
+        value: 'shanghai',
+        label: 'Shanghai',
+        children: [
+          {
+            value: 'shanghaishi',
+            label: 'Shanghai',
+            children: [
+              {
+                value: 'huangpu',
+                label: 'Huangpu',
+              },
+            ],
+          },
+        ],
+      },
+    ];
+    const treeData = [
+      {
+        key: 'node1',
+        title: 'Node1',
+        children: [
+          {
+            key: 'node2',
+            title: 'Node2',
+          },
+        ],
+      },
+      {
+        key: 'node3',
+        title: 'Node3',
+        children: [
+          {
+            key: 'node4',
+            title: 'Node4',
+          },
+          {
+            key: 'node5',
+            title: 'Node5',
+          },
+        ],
+      },
+    ]
+
+    return {
+      form,
+      options,
+      treeData,
+      handleSubmit
+    }
+  },
 }
 </script>
 ```

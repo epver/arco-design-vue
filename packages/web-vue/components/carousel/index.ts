@@ -1,7 +1,7 @@
 import type { App } from 'vue';
 import type { ArcoOptions } from '../_utils/types';
 import { setGlobalConfig, getComponentPrefix } from '../_utils/global-config';
-import _Carousel from './carousel.vue';
+import _Carousel from './carousel';
 import _CarouselItem from './carousel-item.vue';
 
 const Carousel = Object.assign(_Carousel, {
@@ -17,5 +17,7 @@ const Carousel = Object.assign(_Carousel, {
 
 export type CarouselInstance = InstanceType<typeof _Carousel>;
 export type CarouselItemInstance = InstanceType<typeof _CarouselItem>;
+
+export { _CarouselItem as CarouselItem };
 
 export default Carousel;

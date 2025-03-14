@@ -1,3 +1,6 @@
+import { Ref } from 'vue';
+import { Size } from '../_utils/constant';
+
 export const VALIDATE_STATUSES = [
   'success',
   'warning',
@@ -130,7 +133,31 @@ export interface FieldRule<FieldValue = any> {
   ) => void;
 }
 
+export interface FieldData {
+  /**
+   * @zh 字段的值
+   * @en Field value
+   */
+  value?: any;
+  /**
+   * @zh 字段的状态
+   * @en Field status
+   */
+  status?: ValidateStatus;
+  /**
+   * @zh 字段的错误信息
+   * @en Field error message
+   */
+  message?: string;
+}
+
 export interface ValidatedError {
+  /**
+   * @zh 标签的文本
+   * @en Label text
+   * @version 2.18.0
+   */
+  label: string;
   /**
    * @zh 字段名
    * @en Field name
@@ -156,4 +183,27 @@ export interface ValidatedError {
    * @en Error message
    */
   message: string;
+}
+
+export interface FormItemEventHandler {
+  /**
+   * @zh onChange
+   * @en onChange
+   */
+  onChange?: (ev?: Event) => void;
+  /**
+   * @zh onInput
+   * @en onInput
+   */
+  onInput?: (ev?: Event) => void;
+  /**
+   * @zh onFocus
+   * @en onFocus
+   */
+  onFocus?: (ev?: Event) => void;
+  /**
+   * @zh onBlur
+   * @en onBlur
+   */
+  onBlur?: (ev?: Event) => void;
 }

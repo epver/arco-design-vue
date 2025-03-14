@@ -8,6 +8,9 @@
         }"
         :prefix-cls="pickerPrefixCls"
         :title="headerTitle"
+        mode="month"
+        :value="headerValue"
+        :on-label-click="onHeaderLabelClick"
       />
       <PanelBody
         mode="month"
@@ -39,7 +42,7 @@ import type {
   IsSameTime,
 } from '../../interface';
 import { newArray } from '../../utils';
-import PanelHeader from '../header.vue';
+import PanelHeader, { HeaderLabelClickFunc } from '../header.vue';
 import PanelBody from '../body.vue';
 import useInjectDatePickerTransform from '../../hooks/use-inject-datepicker-transform';
 
@@ -92,6 +95,13 @@ export default defineComponent({
     dateRender: {
       type: Function as PropType<RenderFunc>,
     },
+    onHeaderLabelClick: {
+      type: Function as PropType<HeaderLabelClickFunc>,
+    },
+    abbreviation: {
+      type: Boolean,
+      default: true,
+    },
   },
   emits: ['select', 'cell-mouse-enter'],
   setup(props, { emit }) {
@@ -105,11 +115,11 @@ export default defineComponent({
 
     const rows = computed(() => {
       const year = headerValue.value.year();
+      const isAbbr = props.abbreviation ? 'short' : 'long';
       const flatData = newArray<Cell>(CELL_COUNT).map((_, index) => ({
-        label: datePickerT(`datePicker.month.long.${MONTH_LIST[index]}`),
+        label: datePickerT(`datePicker.month.${isAbbr}.${MONTH_LIST[index]}`),
         value: dayjs(`${year}-${index + 1}`, 'YYYY-M'),
       }));
-
       const rows = newArray(ROW_COUNT).map((_, index) =>
         flatData.slice(index * COL_COUNT, (index + 1) * COL_COUNT)
       );

@@ -14,23 +14,27 @@
   (@switch-size-small - @switch-line-size-dot-small) / 2
 );
 
-.switchSlideText-enter,
-.switchSlideText-appear {
+.switch-slide-text-enter-from {
   left: -100% !important;
 }
 
-.switchSlideText-enter-active,
-.switchSlideText-appear-active {
+.switch-slide-text-enter-to {
   left: 8px !important;
+}
+
+.switch-slide-text-enter-active {
   transition: left @transition-duration-2 @transition-timing-function-standard;
 }
 
-.switchSlideText-exit {
+.switch-slide-text-leave-from {
   left: 100% !important;
 }
 
-.switchSlideText-exit-active {
+.switch-slide-text-leave-to {
   left: @switch-size-dot-default + @switch-size-default-gap + 6px !important;
+}
+
+.switch-slide-text-leave-active {
   transition: left @transition-duration-2 @transition-timing-function-standard;
 }
 
@@ -72,10 +76,24 @@
   }
 
   &-checked &-handle {
-    left: 100%;
-    margin-left: -@switch-size-default-gap;
+    left: calc(100% - @switch-size-dot-default - @switch-size-default-gap);
     color: @switch-color-dot-icon_on;
-    transform: translateX(-100%);
+  }
+
+  &[disabled] &-handle {
+    color: @switch-color-dot-icon_off_disabled;
+  }
+
+  &[disabled]&-checked &-handle {
+    color: @switch-color-dot-icon_on_disabled;
+  }
+
+  &[disabled] &-handle {
+    color: @switch-color-dot-icon_off_disabled;
+  }
+
+  &[disabled]&-checked &-handle {
+    color: @switch-color-dot-icon_on_disabled;
   }
 
   &-text-holder {
@@ -98,6 +116,7 @@
 
   &-checked &-text {
     left: 8px;
+    color: @switch-color-text_on;
   }
 
   // Disabled
@@ -169,8 +188,7 @@
   }
 
   &-small&-checked &-handle {
-    left: 100%;
-    margin-left: -@switch-size-small-gap;
+    left: calc(100% - @switch-size-dot-small - @switch-size-small-gap);
   }
 }
 
@@ -234,9 +252,20 @@
     }
   }
 
+  &-type-line&-custom-color {
+    --custom-color: @switch-color-bg_off;
+
+    &::after {
+      background-color: var(--custom-color);
+    }
+  }
+
+  &-type-line&-custom-color&-checked {
+    --custom-color: @switch-color-bg_on;
+  }
+
   &-type-line&-checked &-handle {
-    left: 100%;
-    margin-left: 0;
+    left: calc(100% - @switch-line-size-dot-default);
   }
 
   // Disabled
@@ -293,5 +322,11 @@
     &-icon {
       transform: translate(-50%, -50%) scale(1);
     }
+  }
+
+  &-type-line&-small&-checked &-handle {
+    left: calc(
+      100% - @switch-line-size-dot-small - @switch-size-small-line-gap
+    );
   }
 }

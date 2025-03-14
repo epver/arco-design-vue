@@ -29,51 +29,6 @@
   }
 }
 
-//.input-style() {
-//  box-sizing: border-box;
-//  width: 100%;
-//  padding-right: @input-padding-horizontal;
-//  padding-left: @input-padding-horizontal;
-//  color: @input-color-text;
-//  font-size: @input-size-default-font-size;
-//  background-color: @input-color-bg;
-//  border: @input-border-width solid @input-color-border;
-//  border-radius: @input-border-radius;
-//  transition: color @transition-duration-1 @transition-timing-function-linear,
-//    border-color @transition-duration-1 @transition-timing-function-linear,
-//    background-color @transition-duration-1 @transition-timing-function-linear;
-//
-//  &:hover {
-//    background-color: @input-color-bg_hover;
-//    border-color: @input-color-border_hover;
-//  }
-//
-//  &:focus,
-//  &&-focus {
-//    background-color: @input-color-bg_focus;
-//    border-color: @input-color-border_focus;
-//    box-shadow: 0 0 0 @input-size-shadow_focus @input-color-shadow_focus;
-//  }
-//
-//  &&-error {
-//    background-color: @input-color-bg_error;
-//    border-color: @input-color-border_error;
-//
-//    &:hover {
-//      background-color: @input-color-bg_error_hover;
-//      border-color: @input-color-border_error_hover;
-//    }
-//  }
-//
-//  &&-error:focus,
-//  &&-error&-focus {
-//    background-color: @input-color-bg_error_focus;
-//    border-color: @input-color-border_error_focus;
-//    box-shadow: 0 0 0 @input-size-shadow_error_focus
-//      @input-color-shadow_error_focus;
-//  }
-//}
-
 .@{input-prefix-cls}-wrapper {
   .input-wrapper-style(@input-prefix-cls);
 
@@ -98,7 +53,6 @@
   }
 
   .@{input-prefix-cls}-word-limit {
-    padding-left: @input-padding-word-limit-left;
     color: @input-color-tip-text;
     font-size: @input-font-tip-size;
   }
@@ -107,15 +61,9 @@
 .@{input-prefix-cls}-outer {
   display: inline-flex;
   width: 100%;
-  height: 100%;
 
   > .@{input-prefix-cls}-wrapper {
     border-radius: 0;
-
-    // ??
-    &-focus {
-      border-radius: @input-border-radius;
-    }
   }
 
   > :first-child {
@@ -138,6 +86,7 @@
 .@{input-prefix-cls}-prepend,
 .@{input-prefix-cls}-append {
   display: inline-flex;
+  flex-shrink: 0;
   align-items: center;
   box-sizing: border-box;
   padding: 0 @input-padding-horizontal;
@@ -151,13 +100,6 @@
   }
 }
 
-.@{input-prefix-cls}-append {
-  border-left: @input-border-addon-separator-width solid
-    @input-color-addon-border;
-
-  .addon(after, @input-size-default-height, @input-size-default-font-size);
-}
-
 .@{input-prefix-cls}-prepend {
   border-right: @input-border-addon-separator-width solid
     @input-color-addon-border;
@@ -165,25 +107,12 @@
   .addon(before, @input-size-default-height, @input-size-default-font-size);
 }
 
-//.@{prefix}-textarea {
-//  .input-style();
-//
-//  position: relative;
-//  max-width: 100%;
-//  height: auto;
-//  min-height: @textarea-size-min-height;
-//  padding: @textarea-padding-vertical @textarea-padding-horizontal;
-//  overflow: auto;
-//  font-size: @textarea-font-size;
-//  line-height: @line-height-base;
-//  vertical-align: top;
-//  resize: vertical;
-//
-//  // 禁用样式
-//  &-disabled {
-//    .disabled-style();
-//  }
-//}
+.@{input-prefix-cls}-append {
+  border-left: @input-border-addon-separator-width solid
+    @input-color-addon-border;
+
+  .addon(after, @input-size-default-height, @input-size-default-font-size);
+}
 
 @import './group.less';
 @import './size.less';

@@ -1,14 +1,15 @@
-import { computed, defineComponent, PropType } from 'vue';
+import type { PropType } from 'vue';
+import { computed, defineComponent, inject } from 'vue';
 import IconHover from '../_components/icon-hover.vue';
 import IconLeft from '../icon/icon-left';
 import IconRight from '../icon/icon-right';
 import IconUp from '../icon/icon-up';
 import IconDown from '../icon/icon-down';
-import { Direction } from '../_utils/constant';
+import type { Direction } from '../_utils/constant';
 import { getPrefixCls } from '../_utils/global-config';
+import { configProviderInjectionKey } from '../config-provider/context';
 
-const BUTTON_TYPES = ['previous', 'next'];
-type ButtonTypes = typeof BUTTON_TYPES[number];
+type ButtonTypes = 'previous' | 'next';
 
 export default defineComponent({
   name: 'TabsButton',
@@ -21,37 +22,43 @@ export default defineComponent({
       type: String as PropType<Direction>,
       default: 'horizontal',
     },
+    disabled: {
+      type: Boolean,
+      default: false,
+    },
     onClick: {
-      type: Function,
-      required: true,
+      type: Function as PropType<(type: ButtonTypes, ev: Event) => void>,
     },
   },
-  setup(props) {
+  emits: ['click'],
+  setup(props, { emit }) {
     const prefixCls = getPrefixCls('tabs-nav-button');
-    const disabledPrev = computed(() => {
-      return false;
-    });
 
-    const disabledNext = computed(() => {
-      return false;
+    const handleClick = (ev: Event) => {
+      if (!props.disabled) {
+        emit('click', props.type, ev);
+      }
+    };
+
+    const configCtx = inject(configProviderInjectionKey, undefined);
+    const rtl = computed(() => {
+      return configCtx?.rtl ?? false;
     });
 
     const renderIcon = () => {
       if (props.direction === 'horizontal') {
         if (props.type === 'next') {
-          return <IconRight />;
+          return rtl.value ? <IconLeft /> : <IconRight />;
         }
-        return <IconLeft />;
+        return rtl.value ? <IconRight /> : <IconLeft />;
       }
-      if (props.type === 'next') {
-        return <IconDown />;
-      }
-      return <IconUp />;
+      return props.type === 'next' ? <IconDown /> : <IconUp />;
     };
 
     const cls = computed(() => [
       prefixCls,
       {
+        [`${prefixCls}-disabled`]: props.disabled,
         [`${prefixCls}-left`]:
           props.direction === 'horizontal' && props.type === 'previous',
         [`${prefixCls}-right`]:
@@ -64,8 +71,8 @@ export default defineComponent({
     ]);
 
     return () => (
-      <div class={cls.value} onClick={() => props.onClick(props.type)}>
-        <IconHover>{renderIcon()}</IconHover>
+      <div class={cls.value} onClick={handleClick}>
+        <IconHover disabled={props.disabled}>{renderIcon()}</IconHover>
       </div>
     );
   },

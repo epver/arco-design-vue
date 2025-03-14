@@ -1,3 +1,5 @@
+import { CSSProperties } from 'vue';
+
 export const getDiffRect = (node: HTMLElement, parentNode: HTMLElement) => {
   const nodeRect = node.getBoundingClientRect();
   const parentNodeRect = parentNode.getBoundingClientRect();
@@ -18,13 +20,24 @@ export const getTabListStyle = ({
   direction: string;
   type: string;
   offset: number;
-}) => {
+}): CSSProperties => {
   if (direction === 'vertical') {
     return { transform: `translateY(${-offset}px)` };
   }
-  if (type === 'capsule') {
-    return { transform: `translateX(${offset}px)` };
-  }
 
   return { transform: `translateX(${-offset}px)` };
+};
+
+export const updateScrollOffset = (
+  parentNode: HTMLElement,
+  direction: 'horizontal' | 'vertical'
+) => {
+  const { scrollTop, scrollLeft } = parentNode;
+
+  if (direction === 'horizontal' && scrollLeft) {
+    parentNode.scrollTo({ left: -1 * scrollLeft });
+  }
+  if (direction === 'vertical' && scrollTop) {
+    parentNode.scrollTo({ top: -1 * scrollTop });
+  }
 };

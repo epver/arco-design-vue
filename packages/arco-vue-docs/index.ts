@@ -9,6 +9,7 @@ import router from './router';
 import locale from './locale';
 import App from './app.vue';
 import ArcoArticle from './components/article/index.vue';
+import AnchorHead from './components/anchor-head/index.vue';
 import CodeBlock from './components/code-block/index.vue';
 import CellDemo from './components/cell-demo/index.vue';
 import CellCode from './components/cell-code/index.vue';
@@ -24,11 +25,8 @@ if (!theme) {
   theme = 'light';
   setLocalStorage('arco-theme', theme);
 }
-let lang = getLocalStorage('arco-lang') ?? '';
-if (!lang) {
-  lang = 'zh-CN';
-  setLocalStorage('arco-lang', lang);
-}
+const lang = /en-US/i.test(window.location.href) ? 'en-US' : 'zh-CN';
+setLocalStorage('arco-lang', lang);
 
 const handleLanguageChange = (lang: string) => {
   if (lang === 'zh-CN' && /en-US/i.test(window.location.href)) {
@@ -79,6 +77,7 @@ checkLogin().then(() => {
   app.component(CodeBlock.name, CodeBlock);
   app.component(CellDemo.name, CellDemo);
   app.component(CellCode.name, CellCode);
+  app.component(AnchorHead.name, AnchorHead);
   app.component(ArcoArticle.name, ArcoArticle);
   app.mount('#root');
 });

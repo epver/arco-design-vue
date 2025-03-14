@@ -19,12 +19,26 @@ description: In a set of data, the user can select one or more data through the 
 
 @import ./__demo__/basic.md
 
+@import ./__demo__/control.md
+
 @import ./__demo__/disabled.md
 
 @import ./__demo__/group.md
 
+@import ./__demo__/options.md
+
+@import ./__demo__/limit.md
+
 @import ./__demo__/all.md
 
-%%API(checkbox.vue)%%
+@import ./__demo__/layout.md
 
-%%API(checkbox-group.vue)%%
+@import ./__demo__/custom.md
+
+## API
+
+%%API(checkbox.tsx)%%
+
+%%API(checkbox-group.tsx)%%
+
+%%INTERFACE(interface.ts)%%

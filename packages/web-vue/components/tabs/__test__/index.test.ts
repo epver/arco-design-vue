@@ -1,3 +1,4 @@
+import { nextTick } from 'vue';
 import { mount } from '@vue/test-utils';
 import Tabs from '../index';
 
@@ -18,6 +19,8 @@ describe('Tabs', () => {
       },
     });
 
+    await nextTick();
+
     await wrapper.findAll('.arco-tabs-tab')[1].trigger('click');
 
     expect(wrapper.emitted('change')?.[0]).toEqual(['2']);
@@ -37,8 +40,11 @@ describe('Tabs', () => {
       },
       props: {
         editable: true,
+        showAddButton: true,
       },
     });
+
+    await nextTick();
 
     await wrapper.find('.arco-tabs-nav-add-btn').trigger('click');
     expect(wrapper.emitted('add')).toHaveLength(1);

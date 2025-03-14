@@ -1,27 +1,20 @@
+@import './token.less';
+
 .@{input-prefix-cls}-group {
   display: inline-flex;
-  // select 圆角重置
-  > .@{prefix}-select {
-    vertical-align: unset;
-
-    .@{prefix}-select-view {
-      border-radius: 0;
-    }
-  }
+  align-items: center;
 
   > * {
     border-radius: 0;
 
-    .@{input-prefix-cls}-group > :last-child,
-    .@{input-prefix-cls}-group > :first-child {
+    &.@{input-prefix-cls}-outer > :last-child,
+    &.@{input-prefix-cls}-outer > :first-child {
       border-radius: 0;
     }
 
     &:not(:last-child) {
       position: relative;
       box-sizing: border-box;
-      border-right: @input-group-border-separator-width solid
-        @input-group-color-separator-border;
     }
 
     &:first-child,
@@ -29,11 +22,9 @@
       border-top-left-radius: @input-group-border-radius_compact;
       border-bottom-left-radius: @input-group-border-radius_compact;
 
-      .@{prefix}-select {
-        .@{prefix}-select-view {
-          border-top-left-radius: @input-group-border-radius_compact;
-          border-bottom-left-radius: @input-group-border-radius_compact;
-        }
+      .@{prefix}-select-view {
+        border-top-left-radius: @input-group-border-radius_compact;
+        border-bottom-left-radius: @input-group-border-radius_compact;
       }
     }
 
@@ -42,21 +33,31 @@
       border-top-right-radius: @input-group-border-radius_compact;
       border-bottom-right-radius: @input-group-border-radius_compact;
 
-      .@{prefix}-select {
-        .@{prefix}-select-view {
-          border-top-right-radius: @input-group-border-radius_compact;
-          border-bottom-right-radius: @input-group-border-radius_compact;
-        }
+      .@{prefix}-select-view {
+        border-top-right-radius: @input-group-border-radius_compact;
+        border-bottom-right-radius: @input-group-border-radius_compact;
       }
     }
   }
 
   // 针对input边框颜色处理
-  > .@{input-prefix-cls}-wrapper:not(:last-child) {
-    border-right-color: @input-group-color-separator-border;
+  > .@{input-prefix-cls}-wrapper:not(:last-child),
+  > .@{input-prefix-cls}-outer:not(:last-child),
+  > .@{prefix}-input-tag:not(:last-child),
+  > .@{prefix}-select-view:not(:last-child) {
+    margin-right: -@input-group-border-separator-width;
+    border-right: @input-group-border-separator-width solid
+      @input-group-color-separator-border;
 
     &:focus-within {
       border-right-color: @input-color-border_focus;
+    }
+  }
+
+  // 针对Error状态的input边框颜色处理
+  > .@{input-prefix-cls}-wrapper.@{input-prefix-cls}-error:not(:last-child) {
+    &:focus-within {
+      border-right-color: @input-color-border_error_focus;
     }
   }
 }

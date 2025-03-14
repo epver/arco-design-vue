@@ -71,6 +71,7 @@
   &-custom-icon {
     margin-right: @tree-margin-custom-icon-right;
     font-size: inherit;
+    line-height: 1;
     cursor: pointer;
     user-select: none;
   }
@@ -135,7 +136,7 @@
     position: relative;
     display: flex;
     flex-wrap: nowrap;
-    align-items: flex-start;
+    align-items: center;
     padding-left: (@tree-size-expand-icon-bg_hover / 2) -
       (@tree-size-default-icon-size / 2);
     color: @tree-color-title-text;
@@ -186,6 +187,7 @@
     width: @tree-size-default-icon-size;
     height: 100%;
     margin-right: @tree-margin-switcher-icon-right;
+    vertical-align: top;
   }
 
   &-node-draggable {
@@ -194,6 +196,8 @@
 
   &-node-title {
     position: relative;
+    display: flex;
+    align-items: center;
     margin-left: -@tree-padding-title-horizontal;
     padding: (
         round((@tree-size-default-line-height - @line-height-base * $font-size)) /
@@ -204,6 +208,7 @@
     padding-left: @tree-padding-title-horizontal;
     font-size: @tree-size-default-font-size;
     border-radius: @tree-node-border-radius;
+
     // overflow: hidden;
     &:hover {
       color: @tree-color-title-text_hover;
@@ -321,12 +326,12 @@
     line-height: 1.667;
   }
 
-  .@{tree-prefix-cls}-node-indent-block::before {
+  .@{tree-prefix-cls}-node-indent-block::after {
     .getLinePos(@tree-size-mini-line-height);
   }
 
   .@{tree-prefix-cls}-node-is-leaf:not(.@{tree-prefix-cls}-node-is-tail)
-    .@{tree-prefix-cls}-node-indent::after {
+    .@{tree-prefix-cls}-node-indent::before {
     .getIndentLinePos(@tree-size-mini-line-height);
   }
 }
@@ -348,12 +353,12 @@
     font-size: @tree-size-small-font-size;
   }
 
-  .@{tree-prefix-cls}-node-indent-block::before {
+  .@{tree-prefix-cls}-node-indent-block::after {
     .getLinePos(@tree-size-small-line-height);
   }
 
   .@{tree-prefix-cls}-node-is-leaf:not(.@{tree-prefix-cls}-node-is-tail)
-    .@{tree-prefix-cls}-node-indent::after {
+    .@{tree-prefix-cls}-node-indent::before {
     .getIndentLinePos(@tree-size-small-line-height);
   }
 }
@@ -375,12 +380,12 @@
     font-size: @tree-size-large-font-size;
   }
 
-  .@{tree-prefix-cls}-node-indent-block::before {
+  .@{tree-prefix-cls}-node-indent-block::after {
     .getLinePos(@tree-size-large-line-height);
   }
 
   .@{tree-prefix-cls}-node-is-leaf:not(.@{tree-prefix-cls}-node-is-tail)
-    .@{tree-prefix-cls}-node-indent::after {
+    .@{tree-prefix-cls}-node-indent::before {
     .getIndentLinePos(@tree-size-large-line-height);
   }
 }

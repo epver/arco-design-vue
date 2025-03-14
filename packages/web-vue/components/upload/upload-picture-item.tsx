@@ -1,4 +1,4 @@
-import { defineComponent, inject, PropType } from 'vue';
+import { computed, defineComponent, inject, PropType } from 'vue';
 import { getPrefixCls } from '../_utils/global-config';
 import UploadProgress from './upload-progress';
 import { FileItem } from './interfaces';
@@ -23,6 +23,12 @@ export default defineComponent({
   setup(props) {
     const prefixCls = getPrefixCls('upload-list');
     const itemCls = `${prefixCls}-picture`;
+    const cls = computed(() => [
+      itemCls,
+      {
+        [`${itemCls}-status-error`]: props.file.status === 'error',
+      },
+    ]);
 
     const uploadCtx = inject(uploadInjectionKey, undefined);
 
@@ -33,48 +39,62 @@ export default defineComponent({
 
       return (
         <>
-          <img src={props.file.url} />
+          {uploadCtx?.slots.image?.({ fileItem: props.file }) ?? (
+            <img
+              src={props.file.url}
+              alt={props.file.name}
+              {...(uploadCtx?.imageLoading
+                ? { loading: uploadCtx.imageLoading }
+                : undefined)}
+            />
+          )}
           <div class={`${itemCls}-mask`}>
-            {props.file.status === 'error' && (
+            {props.file.status === 'error' && uploadCtx?.showCancelButton && (
               <div class={`${itemCls}-error-tip`}>
                 <span
                   class={[uploadCtx?.iconCls, `${uploadCtx?.iconCls}-error`]}
                 >
-                  {uploadCtx?.customIcon?.errorIcon?.() || <IconImageClose />}
+                  {uploadCtx?.slots['error-icon']?.() ??
+                    uploadCtx?.customIcon?.errorIcon?.() ?? <IconImageClose />}
                 </span>
               </div>
             )}
             <div class={`${itemCls}-operation`}>
-              {props.file.status !== 'error' && (
+              {props.file.status !== 'error' && uploadCtx?.showPreviewButton && (
                 <span
                   class={[uploadCtx?.iconCls, `${uploadCtx?.iconCls}-preview`]}
                   onClick={() => uploadCtx?.onPreview(props.file)}
                 >
-                  {uploadCtx?.customIcon?.previewIcon?.() || <IconEye />}
+                  {uploadCtx?.slots['preview-icon']?.() ??
+                    uploadCtx?.customIcon?.previewIcon?.() ?? <IconEye />}
                 </span>
               )}
-              {['init', 'error'].includes(props.file.status as string) && (
-                <span
-                  class={[uploadCtx?.iconCls, `${uploadCtx?.iconCls}-upload`]}
-                  onClick={() => uploadCtx?.onUpload(props.file)}
-                >
-                  {uploadCtx?.customIcon?.retryIcon?.() || <IconUpload />}
-                </span>
-              )}
-              {!uploadCtx.disabled && (
+              {['init', 'error'].includes(props.file.status as string) &&
+                uploadCtx?.showRetryButton && (
+                  <span
+                    class={[uploadCtx?.iconCls, `${uploadCtx?.iconCls}-upload`]}
+                    onClick={() => uploadCtx?.onUpload(props.file)}
+                  >
+                    {uploadCtx?.slots['retry-icon']?.() ??
+                      uploadCtx?.customIcon?.retryIcon?.() ?? <IconUpload />}
+                  </span>
+                )}
+              {!uploadCtx?.disabled && uploadCtx?.showRemoveButton && (
                 <span
                   class={[uploadCtx?.iconCls, `${uploadCtx?.iconCls}-remove`]}
                   onClick={() => uploadCtx?.onRemove(props.file)}
                 >
-                  {uploadCtx?.customIcon?.removeIcon?.() || <IconDelete />}
+                  {uploadCtx?.slots['remove-icon']?.() ??
+                    uploadCtx?.customIcon?.removeIcon?.() ?? <IconDelete />}
                 </span>
               )}
+              {uploadCtx?.slots['extra-button']?.(props.file)}
             </div>
           </div>
         </>
       );
     };
 
-    return () => <span class={itemCls}>{renderCard()}</span>;
+    return () => <span class={cls.value}>{renderCard()}</span>;
   },
 });

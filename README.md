@@ -1,6 +1,6 @@
 <div align="center">
   <a href="https://arco.design" target="_blank">
-    <img alt="Arco Design Logo" width="100" src="https://avatars.githubusercontent.com/u/64576149?s=200&v=4"/>
+    <img alt="Arco Design Logo" width="200" src="https://avatars.githubusercontent.com/u/64576149?s=200&v=4"/>
   </a>
 </div>
 <div align="center">
@@ -48,6 +48,9 @@ npm install @arco-design/web-vue
 
 // with yarn
 yarn add @arco-design/web-vue
+
+// with pnpm
+pnpm add @arco-design/web-vue
 ```
 
 # Examples
@@ -63,20 +66,13 @@ app.use(ArcoVue);
 app.mount('#app');
 ```
 
-## Development
-
-1. Use `npm install` to install basic packages such as `lerna` and `yarn`
-
-2. Use `yarn install` to install the dependencies of each package in `workspaces`
-
-3. Use `npm run init` to initialize the project
-
 # Useful Links
 
 * [Documentation website](https://arco.design/)
 * [Dark mode](https://arco.design/vue/docs/dark)
 * [Theme customization](https://arco.design/vue/docs/theme)
 * [Figma component library](https://www.figma.com/file/FVu1DydEeXvJqXrkOb90Oi/ArcoDesign%E7%BB%84%E4%BB%B6%E8%AE%BE%E8%AE%A1_2.0?node-id=5472%3A308)
+* [Awesome Arco](https://github.com/arco-design/awesome-arco)
 
 # Ecosystems
 
@@ -102,6 +98,10 @@ app.mount('#app');
 
 Developers interested in contributing should read the [Code of Conduct](./CODE_OF_CONDUCT.md) and
 the [Contributing Guide](./CONTRIBUTING.md).
+
+Thank you to all the people who already contributed to ArcoDesign!
+
+<a href="https://github.com/arco-design/arco-design-vue/graphs/contributors"><img src="https://contrib.rocks/image?repo=arco-design/arco-design-vue" /></a>
 
 # License
 

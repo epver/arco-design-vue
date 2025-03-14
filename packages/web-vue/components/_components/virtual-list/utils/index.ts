@@ -1,4 +1,4 @@
-import { Key } from '../interface';
+import { VirtualItemKey } from '../interface';
 
 /**
  * 获取有效的scrollTop值
@@ -22,7 +22,9 @@ export function getScrollPercentage({
   clientHeight: number;
 }) {
   const scrollLength = scrollHeight - clientHeight;
-  return getValidScrollTop(scrollTop, scrollLength) / scrollLength;
+  return scrollLength
+    ? getValidScrollTop(scrollTop, scrollLength) / scrollLength
+    : 0;
 }
 
 /**
@@ -81,7 +83,7 @@ export function getItemRelativeTop({
   clientHeight,
 }: Omit<ItemTopConfig, 'scrollTop'>) {
   if (scrollPtg === 1) return clientHeight - itemHeight;
-  return Math.floor(clientHeight * scrollPtg - itemHeight * itemOffsetPtg);
+  return clientHeight * scrollPtg - itemHeight * itemOffsetPtg;
 }
 
 /**
@@ -95,10 +97,10 @@ interface CompareItemConfig {
   locatedItemRelativeTop: number;
   locatedItemIndex: number;
   compareItemIndex: number;
-  getItemKeyByIndex: (index: number) => Key;
+  getItemKeyByIndex: (index: number) => VirtualItemKey;
   startIndex: number;
   endIndex: number;
-  getItemHeightOrDefault: (key: Key) => number;
+  getItemHeightOrDefault: (key: VirtualItemKey) => number;
 }
 
 /**

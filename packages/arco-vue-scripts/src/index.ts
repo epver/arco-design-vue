@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+import path from 'path';
+import fs from 'fs-extra';
 import { Command } from 'commander';
 import icongen from './scripts/icongen';
 import lessgen from './scripts/lessgen';
@@ -11,12 +13,24 @@ import buildComponent from './scripts/build-component';
 import buildStyle from './scripts/build-style';
 import buildSite from './scripts/build-site';
 import buildMaterial from './scripts/build-material';
+import buildMaterialLibrary from './scripts/build-material-library';
 import test from './scripts/test';
+// import screentshotTest from './scripts/test/screentshot';
 import changelog from './scripts/changelog';
+import jsongen from './scripts/jsongen';
 
 const program = new Command();
 
-program.version('0.1.0').name('arco-vue-scripts').usage('command [options]');
+const packageContent = fs.readFileSync(
+  path.resolve(__dirname, '../package.json'),
+  'utf8'
+);
+const packageData: any = JSON.parse(packageContent);
+
+program
+  .version(packageData.version)
+  .name('arco-vue-scripts')
+  .usage('command [options]');
 
 program
   .command('docgen')
@@ -80,8 +94,9 @@ program
 program
   .command('build:style')
   .description('build style related files.')
-  .action(async () => {
-    await buildStyle();
+  .option('-M, --material', 'generate style for material')
+  .action(async ({ material }) => {
+    await buildStyle({ material });
   });
 
 program
@@ -99,6 +114,13 @@ program
   });
 
 program
+  .command('build:material-library')
+  .description('build vue material library.')
+  .action(async () => {
+    await buildMaterialLibrary();
+  });
+
+program
   .command('test')
   .description('run test for component or material.')
   .option('-c, --components <names>', 'component name(s) joined by comma(,)')
@@ -108,6 +130,15 @@ program
     await test(components, program.args.slice(1));
   });
 
+// program
+//   .command('test:screenshot')
+//   .description('run test:screenshot for components.')
+//   .option('-d, --domain <domain>', 'gen screentshots')
+//   .option('-o, --outDir <outDir>', 'gen screentshots')
+//   .action(async ({ domain, outDir }) => {
+//     await screentshotTest(domain, outDir);
+//   });
+
 program
   .command('changelog')
   .description(
@@ -115,6 +146,13 @@ program
   )
   .action(async () => {
     await changelog();
+  });
+
+program
+  .command('jsongen')
+  .description('generate vetur and web-types json files')
+  .action(async () => {
+    await jsongen();
   });
 
 program.parse(process.argv);

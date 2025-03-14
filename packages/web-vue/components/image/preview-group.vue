@@ -11,7 +11,11 @@
     :popup-container="popupContainer"
     :render-to-body="renderToBody"
     @close="onClose"
-  />
+  >
+    <template v-if="$slots.actions" #actions>
+      <slot name="actions" :url="currentUrl" />
+    </template>
+  </ImagePreview>
 </template>
 <script lang="tsx">
 import {
@@ -62,7 +66,7 @@ export default defineComponent({
      */
     defaultCurrent: {
       type: Number,
-      default: 1,
+      default: 0,
     },
     /**
      * @zh 是否无限循环
@@ -83,7 +87,7 @@ export default defineComponent({
     },
     /**
      * @zh 默认是否可见，非受控
-     * @en Default visiblity
+     * @en Default visibility
      */
     defaultVisible: {
       type: Boolean,
@@ -125,24 +129,32 @@ export default defineComponent({
      * @en Set the mount point of the pop-up box, the same as the `to` of `teleport`, the default value is document.body
      */
     popupContainer: {
-      type: [Object, String] as PropType<HTMLElement | string>,
+      type: [String, Object] as PropType<string | HTMLElement>,
     },
   },
   emits: [
     /**
      * @zh 切换图片
      * @en Image switch
+     * @param {number} index
      */
     'change',
     'update:current',
     /**
      * @zh 预览的打开和关闭
      * @en Preview visibility change
+     * @param {boolean} visible
      */
     'visible-change',
     'update:visible',
   ],
-  setup(props: ImagePreviewGroupProps, { emit }) {
+  /**
+   * @zh 自定义额外的操作项
+   * @en Customize additional action items
+   * @slot actions
+   * @version 2.46.0
+   */
+  setup(props, { emit }) {
     const {
       srcList,
       visible,
@@ -168,9 +180,13 @@ export default defineComponent({
 
     const propImageUrlMap = computed(
       () =>
-        isArray(srcList?.value) &&
         new Map(
-          srcList?.value.map((url, index) => [index, { url, canPreview: true }])
+          isArray(srcList?.value)
+            ? srcList?.value.map((url, index) => [
+                index,
+                { url, canPreview: true },
+              ])
+            : []
         )
     );
 
@@ -181,14 +197,14 @@ export default defineComponent({
     const imageCount = computed(() => imageIdList.value.length);
 
     function registerImageUrl(id: number, url: string, canPreview: boolean) {
-      if (!propImageUrlMap.value) {
+      if (!propImageUrlMap.value.has(id))
         imageUrlMap.value.set(id, {
           url,
           canPreview,
         });
-      }
+
       return function unRegisterPreviewUrl() {
-        if (!propImageUrlMap.value) {
+        if (!propImageUrlMap.value.has(id)) {
           imageUrlMap.value.delete(id);
         }
       };

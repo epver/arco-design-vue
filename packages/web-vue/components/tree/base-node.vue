@@ -1,5 +1,5 @@
 <template>
-  <div :class="classNames">
+  <div :class="classNames" :data-level="level" :data-key="nodekey">
     <!-- 缩进 -->
     <span :class="`${prefixCls}-indent`">
       <span
@@ -24,15 +24,14 @@
     >
       <NodeSwitcher
         :prefix-cls="prefixCls"
-        :expanded="expanded"
         :loading="loading"
         :show-line="showLine"
-        :is-leaf="isLeaf"
         :tree-node-data="treeNodeData"
         :icons="{
           switcherIcon,
           loadingIcon,
         }"
+        :node-status="nodeStatus"
         @click="onSwitcherClick"
       >
         <template v-if="$slots['switcher-icon']" #switcher-icon>
@@ -46,14 +45,14 @@
       </NodeSwitcher>
     </span>
     <!-- checkbox -->
-    <span v-if="checkable">
-      <Checkbox
-        :disabled="disableCheckbox || disabled"
-        :model-value="checked"
-        :indeterminate="indeterminate"
-        @change="onCheckboxChange"
-      />
-    </span>
+    <Checkbox
+      v-if="checkable"
+      :disabled="disableCheckbox || disabled"
+      :model-value="checked"
+      :indeterminate="indeterminate"
+      uninject-group-context
+      @change="onCheckboxChange"
+    />
 
     <!-- 内容 -->
     <span
@@ -68,28 +67,48 @@
       @click="onTitleClick"
     >
       <span
-        v-if="$slots.icon || icon"
+        v-if="$slots.icon || icon || treeNodeIcon"
         :class="[`${prefixCls}-icon`, `${prefixCls}-custom-icon`]"
       >
-        <!-- @slot 节点图标 -->
-        <slot v-if="$slots.icon" name="icon" />
-        <RenderFunction v-else :render-func="icon" />
+        <!-- 节点图标 -->
+        <slot v-if="$slots.icon" name="icon" v-bind="nodeStatus" />
+        <RenderFunction
+          v-else-if="icon"
+          :render-func="icon"
+          v-bind="nodeStatus"
+        />
+        <RenderFunction
+          v-else-if="treeNodeIcon"
+          :render-func="treeNodeIcon"
+          :node="treeNodeData"
+          v-bind="nodeStatus"
+        />
       </span>
       <span :class="`${prefixCls}-title-text`">
         <RenderFunction v-if="treeTitle" :render-func="treeTitle" />
-        <!-- @slot 标题，优先级高于 props 的 title -->
-        <slot v-else name="title">{{ title }}</slot>
+        <!-- 标题，treeTitle 优先级高于节点的 title -->
+        <slot v-else name="title" :title="title">{{ title }}</slot>
 
         <span
           v-if="draggable"
           :class="[`${prefixCls}-icon`, `${prefixCls}-drag-icon`]"
         >
-          <!-- @slot 拖拽图标 -->
-          <slot v-if="$slots['drag-icon']" name="drag-icon" />
-          <RenderFunction v-else-if="dragIcon" :render-func="dragIcon" />
+          <!-- 拖拽图标 -->
+          <slot
+            v-if="$slots['drag-icon']"
+            name="drag-icon"
+            v-bind="nodeStatus"
+          />
+          <RenderFunction
+            v-else-if="dragIcon"
+            :render-func="dragIcon"
+            v-bind="nodeStatus"
+          />
           <RenderFunction
             v-else-if="treeDragIcon"
             :render-func="treeDragIcon"
+            :node="treeNodeData"
+            v-bind="nodeStatus"
           />
           <IconDragDotVertical v-else />
         </span>
@@ -117,9 +136,10 @@ import useNodeKey from './hooks/use-node-key';
 import Checkbox from '../checkbox';
 import RenderFunction from '../_components/render-function';
 import { isFunction } from '../_utils/is';
-import { TreeNodeProps, Node } from './interface';
+import { Node } from './interface';
 import useDraggable from './hooks/use-draggable';
 import IconDragDotVertical from '../icon/icon-drag-dot-vertical';
+import { toArray } from '../_utils/to-array';
 
 export default defineComponent({
   name: 'BaseTreeNode',
@@ -130,10 +150,6 @@ export default defineComponent({
     IconDragDotVertical,
   },
   props: {
-    /** 唯一标示 */
-    key: {
-      type: String,
-    },
     /** 标题 */
     title: {
       type: String,
@@ -163,16 +179,16 @@ export default defineComponent({
       type: Boolean,
     },
     icon: {
-      type: Function as PropType<() => VNode[]>,
+      type: Function as PropType<() => VNode>,
     },
     switcherIcon: {
-      type: Function as PropType<() => VNode[]>,
+      type: Function as PropType<() => VNode>,
     },
     loadingIcon: {
-      type: Function as PropType<() => VNode[]>,
+      type: Function as PropType<() => VNode>,
     },
     dragIcon: {
-      type: Function as PropType<() => VNode[]>,
+      type: Function as PropType<() => VNode>,
     },
     isTail: {
       type: Boolean,
@@ -192,13 +208,19 @@ export default defineComponent({
       default: () => [],
     },
   },
-  setup(props: TreeNodeProps) {
+  setup(props) {
     const key = useNodeKey();
     const prefixCls = getPrefixCls('tree-node');
     const treeContext = useTreeContext();
-    const node = computed(() => treeContext.key2TreeNode?.[key.value] as Node);
+    const node = computed(
+      () => treeContext.key2TreeNode?.get(key.value) as Node
+    );
     const treeNodeData = computed(() => node.value.treeNodeData);
     const children = computed(() => node.value.children);
+    const actionOnNodeClick = computed(() => {
+      const action = treeContext.treeProps?.actionOnNodeClick;
+      return action ? toArray(action) : [];
+    });
 
     const { isLeaf, isTail, selectable, disabled, disableCheckbox, draggable } =
       toRefs(props);
@@ -210,7 +232,8 @@ export default defineComponent({
         [`${prefixCls}-is-leaf`]: isLeaf.value,
         [`${prefixCls}-is-tail`]: isTail.value,
         [`${prefixCls}-expanded`]: expanded.value,
-        [`${prefixCls}-disabled-selectable`]: !selectable.value,
+        [`${prefixCls}-disabled-selectable`]:
+          !selectable.value && !treeContext.treeProps?.disableSelectActionOnly,
         [`${prefixCls}-disabled`]: disabled.value,
       },
     ]);
@@ -242,12 +265,6 @@ export default defineComponent({
       },
     ]);
 
-    const treeTitle = computed(() =>
-      treeContext.nodeTitle
-        ? () => treeContext.nodeTitle?.(treeNodeData.value)
-        : undefined
-    );
-
     const checked = computed(() =>
       treeContext.checkedKeys?.includes?.(key.value)
     );
@@ -270,7 +287,39 @@ export default defineComponent({
 
     const treeDragIcon = computed(() => treeContext.dragIcon);
 
+    const treeNodeIcon = computed(() => treeContext.nodeIcon);
+
+    function onSwitcherClick(e: Event) {
+      if (isLeaf.value) return;
+      if (!children.value?.length && isFunction(treeContext.onLoadMore)) {
+        treeContext.onLoadMore(key.value);
+      } else {
+        treeContext?.onExpand?.(!expanded.value, key.value, e);
+      }
+    }
+
+    const nodeStatus = reactive({
+      loading,
+      checked,
+      selected,
+      indeterminate,
+      expanded,
+      isLeaf,
+    });
+
+    const treeTitle = computed(() =>
+      treeContext.nodeTitle
+        ? () => treeContext.nodeTitle?.(treeNodeData.value, nodeStatus)
+        : undefined
+    );
+    const extra = computed(() =>
+      treeContext.nodeExtra
+        ? () => treeContext.nodeExtra?.(treeNodeData.value, nodeStatus)
+        : undefined
+    );
+
     return {
+      nodekey: key,
       refTitle,
       prefixCls,
       classNames,
@@ -283,11 +332,9 @@ export default defineComponent({
       treeNodeData,
       loading,
       treeDragIcon,
-      extra: computed(() =>
-        treeContext.nodeExtra
-          ? () => treeContext.nodeExtra?.(treeNodeData.value)
-          : undefined
-      ),
+      treeNodeIcon,
+      extra,
+      nodeStatus,
       onCheckboxChange(checked: boolean, e: Event) {
         if (disableCheckbox.value || disabled.value) {
           return;
@@ -295,17 +342,13 @@ export default defineComponent({
         treeContext.onCheck?.(checked, key.value, e);
       },
       onTitleClick(e: Event) {
+        if (actionOnNodeClick.value.includes('expand')) {
+          onSwitcherClick(e);
+        }
         if (!selectable.value || disabled.value) return;
         treeContext.onSelect?.(key.value, e);
       },
-      onSwitcherClick(e: Event) {
-        if (isLeaf.value) return;
-        if (!children.value?.length && isFunction(treeContext.onLoadMore)) {
-          treeContext.onLoadMore(key.value);
-        } else {
-          treeContext?.onExpand?.(!expanded.value, key.value, e);
-        }
-      },
+      onSwitcherClick,
       onDragStart(e: DragEvent) {
         if (!draggable.value) return;
 

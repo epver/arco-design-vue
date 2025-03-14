@@ -15,12 +15,17 @@ description: Divide the content area and separate the modules.
 
 @import ./__demo__/vertical.md
 
+## API
+
 
 ### `<divider>` Props
 
-|Attribute|Description|Type|Default|
-|---|---|---|:---:|
-|direction|The direction of the dividing line. Can be horizontal or vertical|`'horizontal' \| 'vertical'`|`'horizontal'`|
-|orientation|The position of the dividing line text|`'left' \| 'right' \| 'center'`|`'center'`|
+|Attribute|Description|Type|Default|version|
+|---|---|---|:---:|:---|
+|direction|The direction of the dividing line. Can be horizontal or vertical|`'horizontal' \| 'vertical'`|`'horizontal'`||
+|orientation|The position of the dividing line text|`'left' \| 'center' \| 'right'`|`'center'`||
+|type|Dividing line style type|`'solid' \| 'dashed' \| 'dotted' \| 'double'`|`-`|2.35.0|
+|size|The wide/height of the dividing line|`number`|`-`|2.35.0|
+|margin|Margin up and down the split line (left and right margin in vertical direction)|`number \| string`|`-`|2.35.0|
 
 

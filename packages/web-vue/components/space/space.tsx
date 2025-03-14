@@ -1,7 +1,16 @@
-import { Comment, CSSProperties, defineComponent, PropType, VNode } from 'vue';
+import {
+  computed,
+  CSSProperties,
+  defineComponent,
+  PropType,
+  Comment,
+  Fragment,
+  inject,
+} from 'vue';
 import { isArray, isNumber } from '../_utils/is';
-import { unFragment } from '../_utils/vue-utils';
+import { getAllElements } from '../_utils/vue-utils';
 import { getPrefixCls } from '../_utils/global-config';
+import { configProviderInjectionKey } from '../config-provider/context';
 
 type SpaceSize = number | 'mini' | 'small' | 'medium' | 'large';
 
@@ -29,7 +38,7 @@ export default defineComponent({
      * @en Spacing size, support for setting horizontal and vertical spacing separately
      */
     size: {
-      type: [Number, String] as PropType<
+      type: [Number, String, Array] as PropType<
         number | 'mini' | 'small' | 'medium' | 'large' | [SpaceSize, SpaceSize]
       >,
       default: 'small',
@@ -41,72 +50,118 @@ export default defineComponent({
     wrap: {
       type: Boolean,
     },
+    /**
+     * @zh 充满整行
+     * @en fill the block
+     * @version 2.11.0
+     */
+    fill: {
+      type: Boolean,
+    },
   },
+  /**
+   * @zh 设置分隔符
+   * @en Set separator
+   * @slot split
+   */
   setup(props, { slots }) {
     const prefixCls = getPrefixCls('space');
+    const configCtx = inject(configProviderInjectionKey, undefined);
+    const rtl = computed(() => {
+      return configCtx?.rtl ?? false;
+    });
 
-    return () => {
-      const { size, direction, align, wrap } = props;
-      const innerAlign = align || (direction === 'horizontal' ? 'center' : '');
-      const classNames = [
-        prefixCls,
-        {
-          [`${prefixCls}-${direction}`]: direction,
-          [`${prefixCls}-align-${innerAlign}`]: innerAlign,
-          [`${prefixCls}-wrap`]: wrap,
-        },
-      ];
+    const mergedAlign = computed(
+      () => props.align ?? (props.direction === 'horizontal' ? 'center' : '')
+    );
 
-      function getMargin(size: SpaceSize) {
-        if (isNumber(size)) {
-          return size;
-        }
-        switch (size) {
-          case 'mini':
-            return 4;
-          case 'small':
-            return 8;
-          case 'medium':
-            return 16;
-          case 'large':
-            return 24;
-          default:
-            return 8;
-        }
+    const cls = computed(() => [
+      prefixCls,
+      {
+        [`${prefixCls}-${props.direction}`]: props.direction,
+        [`${prefixCls}-align-${mergedAlign.value}`]: mergedAlign.value,
+        [`${prefixCls}-wrap`]: props.wrap,
+        [`${prefixCls}-fill`]: props.fill,
+        [`${prefixCls}-rtl`]: rtl.value,
+      },
+      rtl.value ? `${prefixCls}-rtl` : '',
+    ]);
+
+    function getMargin(size: SpaceSize) {
+      if (isNumber(size)) {
+        return size;
+      }
+      switch (size) {
+        case 'mini':
+          return 4;
+        case 'small':
+          return 8;
+        case 'medium':
+          return 16;
+        case 'large':
+          return 24;
+        default:
+          return 8;
+      }
+    }
+
+    const getMarginStyle = (isLast: boolean): CSSProperties => {
+      const style: CSSProperties = {};
+
+      const marginRight = `${getMargin(
+        isArray(props.size) ? props.size[0] : props.size
+      )}px`;
+      const marginBottom = `${getMargin(
+        isArray(props.size) ? props.size[1] : props.size
+      )}px`;
+      const marginLeft = `${getMargin(
+        isArray(props.size) ? props.size[0] : props.size
+      )}px`;
+
+      if (isLast) {
+        return props.wrap ? { marginBottom } : {};
       }
 
-      const childrenList = unFragment(slots.default?.() || []).filter(
-        (child) => (child as VNode)?.type !== Comment
+      if (props.direction === 'horizontal') {
+        if (rtl.value) {
+          style.marginLeft = marginLeft;
+        } else {
+          style.marginRight = marginRight;
+        }
+      }
+      if (props.direction === 'vertical' || props.wrap) {
+        style.marginBottom = marginBottom;
+      }
+
+      return style;
+    };
+
+    return () => {
+      const children = getAllElements(slots.default?.(), true).filter(
+        (item) => item.type !== Comment
       );
 
-      const getMarginStyle = (index: number) => {
-        const isLastOne = childrenList.length === index + 1;
-
-        const marginRight = `${getMargin(isArray(size) ? size[0] : size)}px`;
-        const marginBottom = `${getMargin(isArray(size) ? size[1] : size)}px`;
-
-        if (isLastOne) {
-          return [wrap ? { marginBottom } : {}];
-        }
-
-        const style: CSSProperties[] = [];
-        if (direction === 'horizontal' || wrap) style.push({ marginRight });
-        if (direction === 'vertical' || wrap) style.push({ marginBottom });
-
-        return style;
-      };
-
       return (
-        <div class={classNames}>
-          {childrenList.map((child, index) => {
+        <div class={cls.value}>
+          {children.map((child, index) => {
+            const shouldRenderSplit = slots.split && index > 0;
             return (
-              <div
-                class={`${prefixCls}-item`}
-                key={index}
-                style={getMarginStyle(index)}
-              >
-                {child}
-              </div>
+              <Fragment key={child.key ?? `item-${index}`}>
+                {shouldRenderSplit && (
+                  <div
+                    class={`${prefixCls}-item-split`}
+                    style={getMarginStyle(false)}
+                  >
+                    {slots.split?.()}
+                  </div>
+                )}
+                <div
+                  class={`${prefixCls}-item`}
+                  style={getMarginStyle(index === children.length - 1)}
+                >
+                  {child}
+                </div>
+              </Fragment>
             );
           })}
         </div>

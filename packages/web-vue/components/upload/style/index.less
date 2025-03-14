@@ -4,9 +4,10 @@
 
 .@{upload-prefix-cls} {
   display: inline-block;
+  max-width: 100%;
   cursor: pointer;
 
-  &:not(&-type-picture-card) {
+  &&-draggable {
     width: 100%;
   }
 
@@ -63,7 +64,7 @@
       background-color: @upload-drag-color-bg_hover;
       border-color: @upload-drag-color-border_hover;
 
-      .@{upload-prefix-cls}-button-drag-text {
+      .@{upload-prefix-cls}-drag-text {
         color: @upload-drag-color-text_hover;
       }
 
@@ -87,7 +88,7 @@
     }
 
     .@{upload-prefix-cls}-tip {
-      margin-top: 0;
+      margin-top: @upload-drag-tip-margin-top;
     }
   }
 
@@ -115,35 +116,29 @@
   }
 
   &-disabled {
-    .@{upload-prefix-cls}-button-picture-card,
-    .@{upload-prefix-cls}-button-picture-card:hover {
+    .@{upload-prefix-cls}-picture-card,
+    .@{upload-prefix-cls}-picture-card:hover {
       color: @upload-picture-color-text_disabled;
       background-color: @upload-picture-color-bg_disabled;
       border-color: @upload-picture-color-border_disabled;
       cursor: not-allowed;
     }
 
-    .@{upload-prefix-cls}-button-drag,
-    .@{upload-prefix-cls}-button-drag:hover {
+    .@{upload-prefix-cls}-drag,
+    .@{upload-prefix-cls}-drag:hover {
       background-color: @upload-drag-color-bg_disabled;
       border-color: @upload-drag-color-border_disabled;
       cursor: not-allowed;
 
       .@{prefix}-icon-plus,
-      .@{upload-prefix-cls}-button-drag-text {
+      .@{upload-prefix-cls}-drag-text {
         color: @upload-drag-color-text_disabled;
       }
     }
 
-    .@{upload-prefix-cls}-button-tip {
+    .@{upload-prefix-cls}-tip {
       color: @upload-drag-color-text_disabled;
     }
-  }
-}
-
-.@{upload-prefix-cls}-hide + .@{upload-prefix-cls}-list {
-  .@{upload-prefix-cls}-list-item:first-of-type {
-    margin-top: 0;
   }
 }
 
@@ -177,26 +172,14 @@
   }
 
   &-upload {
+    color: @upload-text-item-color-reupload-icon;
     font-size: @upload-text-item-size-reupload-icon;
+    cursor: pointer;
     transition: all @transition-duration-2 ease;
 
     &:active,
     &:hover {
       color: @upload-text-item-color-reupload-icon_hover;
-    }
-  }
-}
-
-.@{upload-prefix-cls}-progress {
-  line-height: @upload-text-item-size-status-icon;
-
-  &:hover {
-    .@{prefix}-progress-circle-mask {
-      stroke: @upload-text-item-color-progress-bg_hover;
-    }
-
-    .@{prefix}-progress-circle-path {
-      stroke: @upload-text-item-color-progress-bg_hover_active;
     }
   }
 }
@@ -209,10 +192,14 @@
   &&-type-text,
   &&-type-picture {
     width: 100%;
+
+    .@{upload-prefix-cls}-list-item:first-of-type {
+      margin-top: @upload-list-margin-top;
+    }
   }
 
   /*** listtype is text ****/
-  &-item-done &-item-text-file-icon {
+  &-item-done &-item-file-icon {
     color: @upload-text-item-color-file-icon_success;
   }
 
@@ -225,13 +212,15 @@
 
     &-content {
       display: flex;
+      flex: 1;
       flex-wrap: nowrap;
       align-items: center;
       box-sizing: border-box;
       width: 100%;
       padding: @upload-text-item-padding-vertical 0;
-      padding-right: @upload-text-item-padding-progress-right;
+      padding-right: @upload-text-item-padding-right;
       padding-left: @upload-text-item-padding-left;
+      overflow: hidden;
       font-size: @upload-text-item-font-size;
       background-color: @upload-text-item-color-bg;
       border-radius: @upload-text-item-border-radius;
@@ -259,7 +248,11 @@
     }
 
     &-name {
+      display: flex;
+      flex: 1;
+      align-items: center;
       margin-right: @upload-text-item-margin-status-left;
+      overflow: hidden;
       color: @upload-text-item-color-text;
       font-size: @upload-text-item-font-size;
       line-height: 1.4286;
@@ -277,11 +270,24 @@
       &-text {
         overflow: hidden;
         text-overflow: ellipsis;
+        cursor: pointer;
       }
     }
 
     & .@{upload-prefix-cls}-progress {
+      position: relative;
       margin-left: auto;
+      line-height: @upload-text-item-size-status-icon;
+
+      &:hover {
+        .@{prefix}-progress-circle-bg {
+          stroke: @upload-text-item-color-progress-bg_hover;
+        }
+
+        .@{prefix}-progress-circle-bar {
+          stroke: @upload-text-item-color-progress-bg_hover_active;
+        }
+      }
     }
 
     &-operation {
@@ -289,7 +295,7 @@
       color: @upload-text-item-color-remove-icon;
       font-size: @upload-text-item-size-operation-icon;
 
-      .@{upload-prefix-cls}-list-remove-icon {
+      .@{upload-prefix-cls}-icon-remove {
         font-size: inherit;
       }
     }
@@ -304,16 +310,30 @@
 
   &-type-text {
     .@{upload-prefix-cls}-list-item-error
-      .@{upload-prefix-cls}-list-item-text-name-link,
-    .@{upload-prefix-cls}-list-item-error
-      .@{upload-prefix-cls}-list-item-text-name {
+      .@{upload-prefix-cls}-list-item-name-link,
+    .@{upload-prefix-cls}-list-item-error .@{upload-prefix-cls}-list-item-name {
       color: @upload-text-item-color-text_error;
+    }
+
+    .@{upload-prefix-cls}-list-item-done
+      .@{upload-prefix-cls}-list-item-name
+      when
+      not(@upload-text-item-color-text_success = unset) {
+      color: @upload-text-item-color-text_success;
+    }
+
+    .@{upload-prefix-cls}-list-item-uploading
+      .@{upload-prefix-cls}-list-item-name
+      when
+      not(@upload-text-item-color-text_uploading = unset) {
+      color: @upload-text-item-color-text_uploading;
     }
   }
 
   /*** end ****/
   &&-type-picture-card {
     display: flex;
+    flex-wrap: wrap;
     vertical-align: top;
 
     .@{upload-prefix-cls}-list-status {
@@ -327,13 +347,14 @@
     display: inline-block;
     margin-top: 0;
     margin-right: @upload-picture-item-margin-right;
+    margin-bottom: @upload-picture-item-margin-bottom;
     padding-right: 0;
     overflow: hidden;
     vertical-align: top;
     transition: all @transition-duration-2 @transition-timing-function-standard;
   }
 
-  &-type-picture-card &-item-error &-item-picture-mask {
+  &-picture-status-error &-picture-mask {
     opacity: 1;
   }
 
@@ -380,7 +401,7 @@
     }
 
     &-error-tip {
-      .@{upload-prefix-cls}-list-error-icon {
+      .@{upload-prefix-cls}-icon-error {
         color: @upload-picture-item-color-error-icon;
         font-size: @upload-picture-item-size-error-icon;
       }
@@ -401,20 +422,42 @@
   }
 
   // picture-list
-  &-type-picture-list {
-    .@{upload-prefix-cls}-list-item-error .@{upload-prefix-cls}-list-item-text {
-      background-color: rgba(
-        @upload-picture-text-item-color-bg_error,
-        @upload-picture-text-item-opacity-bg_error
-      );
+  &-type-picture {
+    .@{upload-prefix-cls}-list-item-content {
+      padding-top: @upload-picture-text-item-padding-vertical;
+      padding-bottom: @upload-picture-text-item-padding-vertical;
     }
 
     .@{upload-prefix-cls}-list-item-error
-      .@{upload-prefix-cls}-list-item-text-name-link,
+      .@{upload-prefix-cls}-list-item-content {
+      background-color: @upload-picture-text-item-color-bg_error;
+    }
+
     .@{upload-prefix-cls}-list-item-error
-      .@{upload-prefix-cls}-list-item-text-name {
+      .@{upload-prefix-cls}-list-item-name-link,
+    .@{upload-prefix-cls}-list-item-error .@{upload-prefix-cls}-list-item-name {
       color: @upload-picture-text-item-color-text_error;
     }
+
+    .@{upload-prefix-cls}-list-item-done
+      .@{upload-prefix-cls}-list-item-name
+      when
+      not(@upload-picture-text-item-color-text_success = unset) {
+      color: @upload-picture-text-item-color-text_success;
+    }
+
+    .@{upload-prefix-cls}-list-item-uploading
+      .@{upload-prefix-cls}-list-item-name
+      when
+      not(@upload-picture-text-item-color-text_uploading = unset) {
+      color: @upload-picture-text-item-color-text_uploading;
+    }
+  }
+}
+
+.@{upload-prefix-cls}-hide + .@{upload-prefix-cls}-list {
+  .@{upload-prefix-cls}-list-item:first-of-type {
+    margin-top: 0;
   }
 }
 

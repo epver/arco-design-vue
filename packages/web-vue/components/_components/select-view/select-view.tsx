@@ -1,35 +1,29 @@
-import type { PropType } from 'vue';
-import { computed, defineComponent, ref, watch } from 'vue';
-import type { Data, ValueData } from '../../_utils/types';
+import type { ComponentPublicInstance, PropType } from 'vue';
+import { computed, defineComponent, ref, toRefs, watch } from 'vue';
+import type { Data } from '../../_utils/types';
 import { getPrefixCls } from '../../_utils/global-config';
-import { INPUT_EVENTS, Size } from '../../_utils/constant';
+import { Size } from '../../_utils/constant';
 import { isArray } from '../../_utils/is';
+import FeedbackIcon from '../feedback-icon.vue';
+import InputLabel from '../input-label/input-label';
 import InputTag from '../../input-tag';
 import IconHover from '../icon-hover.vue';
 import IconDown from '../../icon/icon-down';
 import IconLoading from '../../icon/icon-loading';
 import IconClose from '../../icon/icon-close';
-import IconExpand from '../../icon/icon-expand';
 import IconSearch from '../../icon/icon-search';
-import { omit } from '../../_utils/omit';
-import pick from '../../_utils/pick';
+import { useFormItem } from '../../_hooks/use-form-item';
+import { useSize } from '../../_hooks/use-size';
+import { SelectViewValue } from './interface';
 
 export default defineComponent({
   name: 'SelectView',
-  inheritAttrs: false,
   props: {
-    /**
-     * 绑定值
-     */
     modelValue: {
-      type: [Object, Array] as PropType<ValueData | ValueData[]>,
+      type: Array as PropType<SelectViewValue[]>,
+      required: true,
     },
-    inputValue: {
-      type: String,
-    },
-    /**
-     * 输入框的提示文字
-     */
+    inputValue: String,
     placeholder: String,
     disabled: {
       type: Boolean,
@@ -49,7 +43,6 @@ export default defineComponent({
     },
     size: {
       type: String as PropType<Size>,
-      default: 'medium',
     },
     bordered: {
       type: Boolean,
@@ -75,152 +68,73 @@ export default defineComponent({
       type: Number,
       default: 0,
     },
-    formatLabel: {
-      type: Function,
+    tagNowrap: {
+      type: Boolean,
+      default: false,
     },
     retainInputValue: {
       type: Boolean,
       default: false,
     },
-    // for JSX
-    onChange: Function,
-    onInputValueChange: Function,
-    onFocus: Function,
-    onBlur: Function,
-    onRemove: Function,
-    onClear: Function,
   },
-  emits: [
-    'update:modelValue',
-    'update:inputValue',
-    'change',
-    'inputValueChange',
-    'focus',
-    'blur',
-    'remove',
-    'clear',
-  ],
-  setup(props, { emit, slots, attrs }) {
+  emits: ['remove', 'clear', 'focus', 'blur'],
+  setup(props, { emit, slots }) {
+    const { size, disabled, error } = toRefs(props);
     const prefixCls = getPrefixCls('select-view');
-    const inputRef = ref<HTMLInputElement>();
-    const focused = ref(false);
-
-    const validValue = computed(() => {
-      // 纠正多选模式传入单值
-      if (props.multiple && !isArray(props.modelValue)) {
-        return props.modelValue ? [props.modelValue] : [];
-      }
-      // 纠正单选
-      if (!props.multiple && isArray(props.modelValue)) {
-        return props.modelValue[0];
-      }
-      return props.modelValue;
+    const {
+      feedback,
+      eventHandlers,
+      mergedDisabled,
+      mergedSize: _mergedSize,
+      mergedError,
+    } = useFormItem({
+      size,
+      disabled,
+      error,
     });
+    const { mergedSize } = useSize(_mergedSize);
 
-    const mergedFocused = computed(() => focused.value || props.opened);
-    const isEmptyValue = computed(() =>
-      isArray(validValue.value)
-        ? validValue.value.length === 0
-        : !validValue.value
-    );
-    const canFocusInput = computed(
-      () => props.allowSearch || props.allowCreate || isArray(validValue.value)
-    );
-    const showInput = computed(
-      () => canFocusInput.value && mergedFocused.value
+    const { opened } = toRefs(props);
+
+    const componentRef = ref<ComponentPublicInstance>();
+    const inputRef = computed<HTMLInputElement>(
+      // @ts-ignore
+      () => componentRef.value?.inputRef
     );
 
+    const isEmptyValue = computed(() => props.modelValue.length === 0);
+    const enabledInput = computed(() => props.allowSearch || props.allowCreate);
     const showClearBtn = computed(
       () => props.allowClear && !props.disabled && !isEmptyValue.value
     );
 
-    const mergedInputValue = computed(() => {
-      // 存在inputValue时，优先展示
-      if (props.inputValue) {
-        return props.inputValue;
-      }
-      if (
-        props.retainInputValue &&
-        !isArray(validValue.value) &&
-        validValue.value?.label
-      ) {
-        return props.formatLabel?.(validValue.value) ?? validValue.value.label;
-      }
-      return '';
-    });
-
-    const mergedPlaceholder = computed(() => {
-      if (isArray(validValue.value)) {
-        return '';
-      }
-      if (canFocusInput.value && !isEmptyValue.value) {
-        return validValue.value?.label;
-      }
-
-      return props.placeholder;
-    });
-
-    // single模式input使用
-    const handleInput = (e: Event) => {
-      const { value } = e.target as HTMLInputElement;
-      emit('inputValueChange', value, e);
+    const handleFocus = (ev: FocusEvent) => {
+      emit('focus', ev);
+      eventHandlers.value?.onFocus?.(ev);
     };
 
-    // multiple模式input-tag使用
-    const handleInputValueChange = (value: string, e: Event) => {
-      emit('inputValueChange', value, e);
-    };
-
-    const handleMousedown = (e: MouseEvent) => {
-      if (inputRef.value && e.target !== inputRef.value) {
-        e.preventDefault();
-        inputRef.value.focus();
-      }
-    };
-
-    const handleFocus = () => {
-      focused.value = true;
-      emit('focus');
-    };
-
-    const handleBlur = () => {
-      focused.value = false;
-      emit('blur');
+    const handleBlur = (ev: FocusEvent) => {
+      emit('blur', ev);
+      eventHandlers.value?.onBlur?.(ev);
     };
 
     const handleRemove = (tag: string) => {
       emit('remove', tag);
     };
 
-    const handleClear = (e: MouseEvent) => {
-      emit('clear', e);
+    const handleClear = (ev: MouseEvent) => {
+      emit('clear', ev);
     };
-
-    watch(
-      () => props.opened,
-      (value: boolean) => {
-        if (inputRef.value) {
-          if (value) {
-            inputRef.value.focus();
-          } else {
-            inputRef.value.blur();
-          }
-        }
-      }
-    );
 
     const renderIcon = () => {
       if (props.loading) {
-        return slots.loadingIcon?.() ?? <IconLoading />;
+        return slots['loading-icon']?.() ?? <IconLoading />;
       }
-      if (props.allowSearch && focused.value) {
-        return slots.searchIcon?.() ?? <IconSearch />;
+      if (props.allowSearch && props.opened) {
+        return slots['search-icon']?.() ?? <IconSearch />;
       }
-      if (slots.arrowIcon) {
-        return slots.arrowIcon();
-      }
-      if (canFocusInput.value) {
-        return <IconExpand style={{ transform: 'rotate(-45deg)' }} />;
+      if (slots['arrow-icon']) {
+        return slots['arrow-icon']();
       }
       return <IconDown class={`${prefixCls}-arrow-icon`} />;
     };
@@ -228,128 +142,96 @@ export default defineComponent({
     const renderSuffix = () => (
       <>
         {showClearBtn.value && (
-          <span
+          <IconHover
             class={`${prefixCls}-clear-btn`}
             onClick={handleClear}
-            onMousedown={(e) => e.stopPropagation()}
+            onMousedown={(ev: MouseEvent) => ev.stopPropagation()}
           >
-            <IconHover>
-              <IconClose />
-            </IconHover>
-          </span>
+            <IconClose />
+          </IconHover>
         )}
         <span class={`${prefixCls}-icon`}>{renderIcon()}</span>
+        {Boolean(feedback.value) && <FeedbackIcon type={feedback.value} />}
       </>
     );
 
-    const renderLabel = () => {
-      if (isArray(validValue.value)) {
-        return null;
+    watch(opened, (opened) => {
+      if (
+        !opened &&
+        inputRef.value &&
+        inputRef.value.isSameNode(document.activeElement)
+      ) {
+        inputRef.value.blur();
       }
-
-      return (
-        slots.label?.({ data: validValue.value }) ??
-        props.formatLabel?.(validValue.value) ??
-        validValue.value?.label
-      );
-    };
+    });
 
     const cls = computed(() => [
-      prefixCls,
-      `${prefixCls}-${isArray(validValue.value) ? 'multiple' : 'single'}`,
-      `${prefixCls}-size-${props.size}`,
+      `${prefixCls}-${props.multiple ? 'multiple' : 'single'}`,
       {
-        [`${prefixCls}-search`]: props.allowSearch,
         [`${prefixCls}-opened`]: props.opened,
-        [`${prefixCls}-focus`]: mergedFocused.value,
-        [`${prefixCls}-disabled`]: props.disabled,
-        [`${prefixCls}-error`]: props.error,
-        [`${prefixCls}-bordered`]: props.bordered,
+        [`${prefixCls}-borderless`]: !props.bordered,
       },
     ]);
 
-    const wrapperAttrs = omit(attrs, INPUT_EVENTS);
-    const inputAttrs = pick(attrs, INPUT_EVENTS);
-
-    const renderSingle = () => {
-      return (
-        <span class={cls.value} onMousedown={handleMousedown} {...wrapperAttrs}>
-          {slots.prefix && (
-            <span class={`${prefixCls}-prefix`}>{slots.prefix()}</span>
-          )}
-          <input
-            ref="inputRef"
-            class={[
-              `${prefixCls}-input`,
-              {
-                [`${prefixCls}-input-hidden`]:
-                  !showInput.value && !isEmptyValue.value,
-              },
-            ]}
-            value={mergedInputValue.value}
-            readonly={!canFocusInput.value}
-            placeholder={mergedPlaceholder.value}
-            disabled={props.disabled}
-            onInput={handleInput}
+    const render = () => {
+      if (props.multiple) {
+        return (
+          <InputTag
+            ref={componentRef}
+            v-slots={{
+              prefix: slots.prefix,
+              suffix: renderSuffix,
+              tag: slots.label,
+            }}
+            baseCls={prefixCls}
+            class={cls.value}
+            modelValue={props.modelValue}
+            inputValue={props.inputValue}
+            focused={props.opened}
+            placeholder={props.placeholder}
+            disabled={mergedDisabled.value}
+            size={mergedSize.value}
+            error={mergedError.value}
+            maxTagCount={props.maxTagCount}
+            disabledInput={!props.allowSearch && !props.allowCreate}
+            tagNowrap={props.tagNowrap}
+            retainInputValue
+            uninjectFormItemContext
+            onRemove={handleRemove}
             onFocus={handleFocus}
             onBlur={handleBlur}
-            {...inputAttrs}
           />
-          <span
-            class={[
-              `${prefixCls}-value`,
-              {
-                [`${prefixCls}-value-hidden`]:
-                  showInput.value || isEmptyValue.value,
-              },
-            ]}
-          >
-            {renderLabel()}
-          </span>
-          <span class={`${prefixCls}-suffix`}>{renderSuffix()}</span>
-        </span>
-      );
-    };
-
-    const renderMultiple = () => {
+        );
+      }
       return (
-        <InputTag
-          ref="inputRef"
+        <InputLabel
+          ref={componentRef}
           v-slots={{
+            default: slots.label,
             prefix: slots.prefix,
             suffix: renderSuffix,
-            tag: slots.label,
           }}
-          modelValue={validValue.value}
-          formatTag={props.formatLabel}
+          baseCls={prefixCls}
+          class={cls.value}
+          modelValue={props.modelValue[0]}
           inputValue={props.inputValue}
+          focused={props.opened}
           placeholder={props.placeholder}
-          disabled={props.disabled}
-          allowClear={props.allowClear}
-          size={props.size}
-          error={props.error}
-          maxTagCount={props.maxTagCount}
-          retainInputValue
-          hideSuffixOnClear={true}
-          onInputValueChange={handleInputValueChange}
+          disabled={mergedDisabled.value}
+          size={mergedSize.value}
+          error={mergedError.value}
+          enabledInput={enabledInput.value}
+          uninjectFormItemContext
           onFocus={handleFocus}
           onBlur={handleBlur}
-          onClear={handleClear}
-          onRemove={handleRemove}
-          {...attrs}
         />
       );
     };
 
-    const render = () => {
-      if (isArray(validValue.value)) {
-        return renderMultiple();
-      }
-      return renderSingle();
-    };
-
     return {
       inputRef,
+      handleFocus,
+      handleBlur,
       render,
     };
   },

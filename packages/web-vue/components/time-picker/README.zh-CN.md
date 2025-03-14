@@ -30,6 +30,8 @@ description: 在弹出面板上选择时间，以便捷完成时间输入的控�
 
 @import ./__demo__/use-12-hours.md
 
+## API
+
 
 ### `<time-picker>` Props
 
@@ -43,7 +45,7 @@ description: 在弹出面板上选择时间，以便捷完成时间输入的控�
 |readonly|是否为只读模式|`boolean`|`false`|
 |error|是否为错误状态|`boolean`|`false`|
 |format|展示日期的格式，参考[字符串解析格式](#字符串解析格式)|`string`|`'HH:mm:ss'`|
-|placeholder|提示文案|`string`|`-`|
+|placeholder|提示文案|`string \| string[]`|`-`|
 |size|输入框尺寸|`'mini' \| 'small' \| 'medium' \| 'large'`|`'medium'`|
 |popup-container|弹出框的挂载容器|`string \| HTMLElement`|`-`|
 |use12-hours|12 小时制|`boolean`|`false`|
@@ -56,7 +58,7 @@ description: 在弹出面板上选择时间，以便捷完成时间输入的控�
 |position|弹出的位置|`'top' \| 'tl' \| 'tr' \| 'bottom' \| 'bl' \| 'br'`|`'bl'`|
 |popup-visible **(v-model)**|控制弹出框打开或者关闭|`boolean`|`-`|
 |default-popup-visible|弹出框默认打开或者关闭|`boolean`|`false`|
-|trigger-props|可以传入 `Trigger` 组件的参数|`Record<string, unknown>`|`-`|
+|trigger-props|可以传入 `Trigger` 组件的参数|`TriggerProps`|`-`|
 |unmount-on-close|是否在关闭后销毁 dom 结构|`boolean`|`false`|
 ### `<time-picker>` Events
 
@@ -68,9 +70,11 @@ description: 在弹出面板上选择时间，以便捷完成时间输入的控�
 |popup-visible-change|弹出框展开和收起|visible: `boolean`|
 ### `<time-picker>` Slots
 
-|插槽名|描述|参数|
-|---|:---:|---|
-|extra|额外的页脚|-|
+|插槽名|描述|参数|版本|
+|---|:---:|---|:---|
+|prefix|输入框前缀|-|2.41.0|
+|suffix-icon|输入框后缀图标|-||
+|extra|额外的页脚|-||
 
 
 

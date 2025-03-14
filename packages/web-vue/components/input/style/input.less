@@ -1,9 +1,30 @@
 @import '../../style/mixins/index.less';
 @import './token.less';
 
+.input-suffix-feedback-icon-color() {
+  .@{prefix}-feedback-icon {
+    display: inline-flex;
+
+    &-status-validating {
+      color: @input-feedback-icon-color_validating;
+    }
+
+    &-status-success {
+      color: @input-feedback-icon-color_success;
+    }
+
+    &-status-warning {
+      color: @input-feedback-icon-color_warning;
+    }
+
+    &-status-error {
+      color: @input-feedback-icon-color_error;
+    }
+  }
+}
+
 .input-wrapper-style(@cls) {
   display: inline-flex;
-  align-items: center;
   box-sizing: border-box;
   width: 100%;
   padding-right: @input-padding-horizontal;
@@ -25,6 +46,7 @@
 
   &:focus-within,
   &.@{cls}-focus {
+    z-index: 1;
     background-color: @input-color-bg_focus;
     border-color: @input-color-border_focus;
     box-shadow: 0 0 0 @input-size-shadow_focus @input-color-shadow_focus;
@@ -62,6 +84,7 @@
 
   &.@{cls}-error:focus-within,
   &.@{cls}-error&-focus {
+    z-index: 1;
     background-color: @input-color-bg_error_focus;
     border-color: @input-color-border_error_focus;
     box-shadow: 0 0 0 @input-size-shadow_error_focus
@@ -72,6 +95,7 @@
   .@{cls}-prefix,
   .@{cls}-suffix {
     display: inline-flex;
+    flex-shrink: 0;
     align-items: center;
     white-space: nowrap;
     user-select: none;
@@ -89,13 +113,16 @@
   .@{cls}-suffix {
     padding-left: @input-padding-horizontal;
     color: @input-color-suffix-text;
+
+    .input-suffix-feedback-icon-color();
   }
 
   // 清除按钮样式
   .@{cls}-clear-btn {
-    display: none;
+    align-self: center;
     color: @input-color-icon-clear;
     font-size: @input-size-icon-clear;
+    visibility: hidden;
     cursor: pointer;
 
     > svg {
@@ -106,11 +133,7 @@
   }
 
   &:hover .@{cls}-clear-btn {
-    display: block;
-  }
-
-  &:hover .@{cls}-suffix-hide-on-clear {
-    display: none;
+    visibility: visible;
   }
 
   // 没有选中情况下显示深色
@@ -139,6 +162,11 @@
 
   &[disabled]::placeholder {
     color: @input-color-text_disabled;
+  }
+
+  // fix color error under disabled status in safari
+  &[disabled] {
+    -webkit-text-fill-color: @input-color-text_disabled;
   }
 }
 

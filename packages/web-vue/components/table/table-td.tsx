@@ -1,8 +1,25 @@
-import { computed, defineComponent, PropType } from 'vue';
+import {
+  computed,
+  createVNode,
+  defineComponent,
+  inject,
+  PropType,
+  ref,
+  VNode,
+} from 'vue';
 import { getPrefixCls } from '../_utils/global-config';
-import { TableColumn, TableData, TableOperationColumn } from './interface';
+import {
+  TableColumnData,
+  TableData,
+  TableDataWithRaw,
+  TableOperationColumn,
+} from './interface';
 import { getFixedCls, getStyle } from './utils';
 import { getValueByPath } from '../_utils/get-value-by-path';
+import IconLoading from '../icon/icon-loading';
+import { isFunction, isObject } from '../_utils/is';
+import { TableContext, tableInjectionKey } from './context';
+import AutoTooltip from '../_components/auto-tooltip/auto-tooltip';
 
 const TD_TYPES = [
   'normal',
@@ -16,15 +33,13 @@ type TdTypes = typeof TD_TYPES[number];
 export default defineComponent({
   name: 'Td',
   props: {
-    isSorted: {
-      type: Boolean,
-    },
+    rowIndex: Number,
     record: {
-      type: Object as PropType<TableData>,
+      type: Object as PropType<TableDataWithRaw>,
       default: () => ({}),
     },
     column: {
-      type: Object as PropType<TableColumn>,
+      type: Object as PropType<TableColumnData>,
       default: () => ({}),
     },
     type: {
@@ -36,7 +51,7 @@ export default defineComponent({
       default: () => [],
     },
     dataColumns: {
-      type: Array as PropType<TableColumn[]>,
+      type: Array as PropType<TableColumnData[]>,
       default: () => [],
     },
     colSpan: {
@@ -62,58 +77,149 @@ export default defineComponent({
       type: Number,
       default: 0,
     },
+    renderExpandBtn: {
+      type: Function as PropType<
+        (record: TableDataWithRaw, stopPropagation?: boolean) => VNode
+      >,
+    },
+    summary: {
+      type: Boolean,
+      default: false,
+    },
   },
   setup(props, { slots }) {
     const prefixCls = getPrefixCls('table');
 
-    const style = computed(() =>
-      getStyle(props.column, {
-        dataColumns: props.dataColumns,
-        operations: props.operations,
-      })
-    );
-
-    const cls = computed(() => [
-      `${prefixCls}-td`,
-      `${prefixCls}-td-align-${props.column?.align ?? 'left'}`,
-      {
-        [`${prefixCls}-col-sorted`]: props.isSorted,
-      },
-      ...getFixedCls(prefixCls, props.column),
-    ]);
-
-    const cellStyle = computed(() => {
-      if (props.isFixedExpand && props.containerWidth) {
-        return { width: `${props.containerWidth}px` };
+    const tooltipProps = computed(() => {
+      if (isObject(props.column?.tooltip)) {
+        return props.column.tooltip;
       }
       return undefined;
     });
+
+    const isSorted = computed(
+      () =>
+        props.column?.dataIndex &&
+        tableCtx.sorter?.field === props.column.dataIndex
+    );
+
+    const resizing = computed(
+      () =>
+        props.column?.dataIndex &&
+        tableCtx.resizingColumn === props.column.dataIndex
+    );
+
+    const getCustomClass = () => {
+      if (props.summary) {
+        return isFunction(props.column?.summaryCellClass)
+          ? props.column.summaryCellClass(props.record?.raw)
+          : props.column?.summaryCellClass;
+      }
+      return isFunction(props.column?.bodyCellClass)
+        ? props.column.bodyCellClass(props.record?.raw)
+        : props.column?.bodyCellClass;
+    };
+
+    const cls = computed(() => [
+      `${prefixCls}-td`,
+      {
+        [`${prefixCls}-col-sorted`]: isSorted.value,
+        [`${prefixCls}-td-resizing`]: resizing.value,
+      },
+      ...getFixedCls(prefixCls, props.column),
+      props.column?.cellClass,
+      getCustomClass(),
+    ]);
+
+    const getCustomStyle = () => {
+      if (props.summary) {
+        return isFunction(props.column?.summaryCellStyle)
+          ? props.column.summaryCellStyle(props.record?.raw)
+          : props.column?.summaryCellStyle;
+      }
+      return isFunction(props.column?.bodyCellStyle)
+        ? props.column.bodyCellStyle(props.record?.raw)
+        : props.column?.bodyCellStyle;
+    };
+
+    const style = computed(() => {
+      const style = getStyle(props.column, {
+        dataColumns: props.dataColumns,
+        operations: props.operations,
+      });
+      const customStyle = getCustomStyle();
+      return {
+        ...style,
+        ...props.column?.cellStyle,
+        ...customStyle,
+      };
+    });
+
+    const cellStyle = computed(() => {
+      if (props.isFixedExpand && props.containerWidth) {
+        return {
+          width: `${props.containerWidth}px`,
+        };
+      }
+      return undefined;
+    });
+
+    const tableCtx = inject<Partial<TableContext>>(tableInjectionKey, {});
 
     const renderContent = () => {
       if (slots.default) {
         return slots.default();
       }
-      if (props.column.render) {
-        return props.column.render({
-          record: props.record,
-          column: props.column,
-        });
+      const data = {
+        record: props.record?.raw,
+        column: props.column,
+        rowIndex: props.rowIndex ?? -1,
+      };
+      if (slots.cell) {
+        return slots.cell(data);
       }
-      return getValueByPath(props.record, props.column.dataIndex) ?? '';
+      if (props.column.slots?.cell) {
+        return props.column.slots.cell(data);
+      }
+      if (props.column.render) {
+        return props.column.render(data);
+      }
+      if (props.column.slotName && tableCtx.slots?.[props.column.slotName]) {
+        return tableCtx.slots[props.column.slotName]?.(data);
+      }
+      return String(
+        getValueByPath(props.record?.raw, props.column.dataIndex) ?? ''
+      );
     };
 
-    return () => (
-      <td
-        class={cls.value}
-        style={style.value}
-        colspan={props.colSpan > 1 ? props.colSpan : undefined}
-      >
+    const isLoading = ref(false);
+
+    const handleClick = (ev: Event) => {
+      if (
+        isFunction(tableCtx.loadMore) &&
+        !props.record?.isLeaf &&
+        !props.record?.children
+      ) {
+        isLoading.value = true;
+        new Promise<TableData[] | undefined>((resolve) => {
+          tableCtx.loadMore?.(props.record.raw, resolve);
+        }).then((children?: TableData[]) => {
+          tableCtx.addLazyLoadData?.(children, props.record);
+          isLoading.value = false;
+        });
+      }
+      ev.stopPropagation();
+    };
+
+    const renderCell = () => {
+      return (
         <span
           class={[
             `${prefixCls}-cell`,
+            `${prefixCls}-cell-align-${props.column?.align ?? 'left'}`,
             {
               [`${prefixCls}-cell-fixed-expand`]: props.isFixedExpand,
-              [`${prefixCls}-cell-text-ellipsis`]: props.column?.ellipsis,
+              [`${prefixCls}-cell-expand-icon`]: props.showExpandBtn,
             },
           ]}
           style={cellStyle.value}
@@ -126,13 +232,54 @@ export default defineComponent({
             />
           )}
           {props.showExpandBtn && (
-            <span style={{ display: 'inline-flex', marginRight: '6px' }}>
-              {slots.expandBtn?.()}
+            <span class={`${prefixCls}-cell-inline-icon`} onClick={handleClick}>
+              {isLoading.value ? (
+                <IconLoading />
+              ) : (
+                props.renderExpandBtn?.(props.record, false)
+              )}
             </span>
           )}
-          {renderContent()}
+          {props.column?.ellipsis && props.column?.tooltip ? (
+            <AutoTooltip
+              class={`${prefixCls}-td-content`}
+              tooltipProps={tooltipProps.value}
+            >
+              {renderContent()}
+            </AutoTooltip>
+          ) : (
+            <span
+              class={[
+                `${prefixCls}-td-content`,
+                {
+                  [`${prefixCls}-text-ellipsis`]: props.column?.ellipsis,
+                },
+              ]}
+            >
+              {renderContent()}
+            </span>
+          )}
         </span>
-      </td>
-    );
+      );
+    };
+
+    return () => {
+      return createVNode(
+        slots.td?.({
+          record: props.record?.raw,
+          column: props.column,
+          rowIndex: props.rowIndex ?? -1,
+        })[0] ?? 'td',
+        {
+          class: cls.value,
+          style: style.value,
+          rowspan: props.rowSpan > 1 ? props.rowSpan : undefined,
+          colspan: props.colSpan > 1 ? props.colSpan : undefined,
+        },
+        {
+          default: () => [renderCell()],
+        }
+      );
+    };
   },
 });

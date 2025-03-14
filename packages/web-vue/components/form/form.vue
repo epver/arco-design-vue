@@ -1,5 +1,5 @@
 <template>
-  <form :class="cls" @submit.prevent="handleSubmit">
+  <form :id="id" ref="formRef" :class="cls" @submit.prevent="handleSubmit">
     <slot />
   </form>
 </template>
@@ -12,17 +12,23 @@ import {
   provide,
   reactive,
   toRefs,
+  ref,
 } from 'vue';
-import { FormItemInfo, formKey } from './context';
+import scrollIntoView, {
+  Options as ScrollIntoViewOptions,
+} from 'scroll-into-view-if-needed';
+import { FormItemInfo, formInjectionKey } from './context';
 import { getPrefixCls } from '../_utils/global-config';
 import { Size } from '../_utils/constant';
-import { isArray, isFunction } from '../_utils/is';
-import { ValidatedError } from './interface';
+import { isArray, isFunction, isBoolean } from '../_utils/is';
+import { FieldData, FieldRule, ValidatedError } from './interface';
+import { useSize } from '../_hooks/use-size';
+import { getFormElementId } from './utils';
 
 const FORM_LAYOUTS = ['horizontal', 'vertical', 'inline'] as const;
-type FormLayout = typeof FORM_LAYOUTS[number];
+type FormLayout = (typeof FORM_LAYOUTS)[number];
 const FORM_LABEL_ALIGNS = ['left', 'right'] as const;
-type FormLabelAlign = typeof FORM_LABEL_ALIGNS[number];
+type FormLabelAlign = (typeof FORM_LABEL_ALIGNS)[number];
 
 export default defineComponent({
   name: 'Form',
@@ -47,11 +53,11 @@ export default defineComponent({
     /**
      * @zh 表单控件的尺寸
      * @en The size of the form
-     * @values 'mini', 'small', 'medium', 'large'
+     * @values 'mini','small','medium','large'
+     * @defaultValue 'medium'
      */
     size: {
       type: String as PropType<Size>,
-      default: 'medium',
     },
     /**
      * @zh 标签元素布局选项。参数同 `<col>` 组件一致
@@ -88,35 +94,79 @@ export default defineComponent({
       type: Boolean,
       default: undefined,
     },
-    // for JSX
-    onSubmit: {
-      type: Function as PropType<() => void>,
+    /**
+     * @zh 表单项校验规则
+     * @en Form item validation rules
+     */
+    rules: {
+      type: Object as PropType<Record<string, FieldRule | FieldRule[]>>,
+    },
+    /**
+     * @zh 是否开启自动标签宽度，仅在 `layout="horizontal"` 下生效。
+     * @en Whether to enable automatic label width, it only takes effect under `layout="horizontal"`.
+     * @version 2.13.0
+     */
+    autoLabelWidth: {
+      type: Boolean,
+      default: false,
+    },
+    /**
+     * @zh 表单 `id` 属性和表单控件 `id` 前缀
+     * @en Form `id` attribute and form control `id` prefix
+     */
+    id: {
+      type: String,
+    },
+    /**
+     * @zh 验证失败后滚动到第一个错误字段
+     * @en Scroll to the first error field after verification fails
+     * @version 2.51.0
+     */
+    scrollToFirstError: {
+      type: Boolean,
+      default: false,
     },
   },
-  emits: [
+  emits: {
     /**
      * @zh 表单提交时触发
      * @en Triggered when the form is submitted
-     * @param {{values: any; errors: undefined | Record<string, ValidatedError>}} data
-     * @param {Event} e
+     * @param {{values: Record<string, any>; errors: Record<string, ValidatedError> | undefined}} data
+     * @param {Event} ev
      */
-    'submit',
+    submit: (
+      data: {
+        values: Record<string, any>;
+        errors: Record<string, ValidatedError> | undefined;
+      },
+      ev: Event
+    ) => true,
     /**
      * @zh 验证成功时触发
      * @en Triggered when verification is successful
-     * @param {any} values
+     * @param {Record<string, any>} values
+     * @param {Event} ev
      */
-    'submitSuccess',
+    submitSuccess: (values: Record<string, any>, ev: Event) => true,
     /**
      * @zh 验证失败时触发
      * @en Triggered when verification failed
-     * @param {{values: any; errors: undefined | Record<string, ValidatedError>}} data
+     * @param {{values: Record<string, any>; errors: Record<string, ValidatedError>}} data
+     * @param {Event} ev
      */
-    'submitFailed',
-  ],
+    submitFailed: (
+      data: {
+        values: Record<string, any>;
+        errors: Record<string, ValidatedError>;
+      },
+      ev: Event
+    ) => true,
+  },
   setup(props, { emit }) {
     const prefixCls = getPrefixCls('form');
+    const formRef = ref<HTMLFormElement>();
     const {
+      id,
       model,
       layout,
       disabled,
@@ -126,10 +176,21 @@ export default defineComponent({
       labelColStyle,
       wrapperColStyle,
       size,
+      rules,
     } = toRefs(props);
+    const { mergedSize } = useSize(size);
+
+    const autoLabelWidth = computed(
+      () => props.layout === 'horizontal' && props.autoLabelWidth
+    );
 
     const fields: FormItemInfo[] = [];
     const touchedFields: FormItemInfo[] = [];
+
+    const labelWidth = reactive<Record<string, number>>({});
+    const maxLabelWidth = computed(() =>
+      Math.max(...Object.values(labelWidth))
+    );
 
     const addField = (formItemInfo: FormItemInfo) => {
       if (formItemInfo && formItemInfo.field) {
@@ -143,16 +204,65 @@ export default defineComponent({
       }
     };
 
-    const resetFields = () => {
+    const setFields = (data: Record<string, FieldData>) => {
       fields.forEach((field) => {
-        field.resetField();
+        if (data[field.field]) {
+          field.setField(data[field.field]);
+        }
       });
     };
 
-    const clearValidate = () => {
+    const setLabelWidth = (width: number, uid?: number) => {
+      if (uid && labelWidth[uid] !== width) {
+        labelWidth[uid] = width;
+      }
+    };
+
+    const removeLabelWidth = (uid?: number) => {
+      if (uid) {
+        delete labelWidth[uid];
+      }
+    };
+
+    const resetFields = (field?: string | string[]) => {
+      const _fields = field ? ([] as string[]).concat(field) : [];
       fields.forEach((field) => {
-        field.clearValidate();
+        if (_fields.length === 0 || _fields.includes(field.field)) {
+          field.resetField();
+        }
       });
+    };
+
+    const clearValidate = (field?: string | string[]) => {
+      const _fields = field ? ([] as string[]).concat(field) : [];
+      fields.forEach((field) => {
+        if (_fields.length === 0 || _fields.includes(field.field)) {
+          field.clearValidate();
+        }
+      });
+    };
+
+    const scrollToField = (field: string, options?: ScrollIntoViewOptions) => {
+      const node = formRef.value || document.body;
+      const fieldNode = node.querySelector(
+        `#${getFormElementId(props.id, field as string)}`
+      );
+
+      if (fieldNode) {
+        scrollIntoView(fieldNode as HTMLDivElement, {
+          behavior: 'smooth',
+          block: 'nearest',
+          scrollMode: 'if-needed',
+          ...options,
+        });
+      }
+    };
+
+    const scrollToFirstError = (field: string) => {
+      const options = !isBoolean(props.scrollToFirstError)
+        ? props.scrollToFirstError
+        : undefined;
+      scrollToField(field, options);
     };
 
     const validate = (
@@ -173,6 +283,10 @@ export default defineComponent({
             errors[item.field] = item;
           }
         });
+
+        if (hasError && props.scrollToFirstError) {
+          scrollToFirstError(Object.keys(errors)[0]);
+        }
 
         if (isFunction(callback)) {
           callback(hasError ? errors : undefined);
@@ -207,6 +321,10 @@ export default defineComponent({
           }
         });
 
+        if (hasError && props.scrollToFirstError) {
+          scrollToFirstError(Object.keys(errors)[0]);
+        }
+
         if (isFunction(callback)) {
           callback(hasError ? errors : undefined);
         }
@@ -231,6 +349,8 @@ export default defineComponent({
           }
         });
         if (hasError) {
+          props.scrollToFirstError &&
+            scrollToFirstError(Object.keys(errors)[0]);
           emit('submitFailed', { values: model.value, errors }, e);
         } else {
           emit('submitSuccess', model.value, e);
@@ -244,8 +364,9 @@ export default defineComponent({
     };
 
     provide(
-      formKey,
+      formInjectionKey,
       reactive({
+        id,
         layout,
         disabled,
         labelAlign,
@@ -254,28 +375,39 @@ export default defineComponent({
         labelColStyle,
         wrapperColStyle,
         model,
-        size,
+        size: mergedSize,
+        rules,
         fields,
         touchedFields,
         addField,
         removeField,
         validateField,
+        setLabelWidth,
+        removeLabelWidth,
+        maxLabelWidth,
+        autoLabelWidth,
       })
     );
 
     const cls = computed(() => [
       prefixCls,
       `${prefixCls}-layout-${props.layout}`,
-      `${prefixCls}-size-${size.value}`,
+      `${prefixCls}-size-${mergedSize.value}`,
+      {
+        [`${prefixCls}-auto-label-width`]: props.autoLabelWidth,
+      },
     ]);
 
     return {
       cls,
+      formRef,
       handleSubmit,
       innerValidate: validate,
       innerValidateField: validateField,
       innerResetFields: resetFields,
       innerClearValidate: clearValidate,
+      innerSetFields: setFields,
+      innerScrollToField: scrollToField,
     };
   },
   methods: {
@@ -284,6 +416,7 @@ export default defineComponent({
      * @en Verify all form data
      * @public
      * @param {(errors: undefined | Record<string, ValidatedError>) => void} callback
+     * @returns {Promise<undefined | Record<string, ValidatedError>>}
      */
     validate(
       callback?: (errors: undefined | Record<string, ValidatedError>) => void
@@ -296,6 +429,7 @@ export default defineComponent({
      * @public
      * @param {string | string[]} field
      * @param {(errors: undefined | Record<string, ValidatedError>) => void} callback
+     * @returns {Promise<undefined | Record<string, ValidatedError>>}
      */
     validateField(
       field: string | string[],
@@ -307,17 +441,38 @@ export default defineComponent({
      * @zh 重置表单数据
      * @en Reset form data
      * @public
+     * @param {string | string[]} field
      */
-    resetFields() {
-      return this.innerResetFields();
+    resetFields(field?: string | string[]) {
+      return this.innerResetFields(field);
     },
     /**
      * @zh 清除校验状态
      * @en Clear verification status
      * @public
+     * @param {string | string[]} field
      */
-    clearValidate() {
-      return this.innerClearValidate();
+    clearValidate(field?: string | string[]) {
+      return this.innerClearValidate(field);
+    },
+    /**
+     * @zh 设置表单项的值和状态
+     * @en Set the value and status of the form item
+     * @param {Record<string, FieldData>} data
+     * @public
+     */
+    setFields(data: Record<string, FieldData>) {
+      return this.innerSetFields(data);
+    },
+    /**
+     * @zh 滚动到指定表单项
+     * @en Scroll to the specified form item
+     * @param {string} field
+     * @public
+     * @version 2.51.0
+     */
+    scrollToField(field: string) {
+      return this.innerScrollToField(field);
     },
   },
 });

@@ -35,6 +35,10 @@ description: Display information content in chronological or reverse order.
 
 @import ./__demo__/label.md
 
-%%API(timeline.vue)%%
+@import ./__demo__/custom.md
+
+## API
+
+%%API(timeline.tsx)%%
 
 %%API(item.vue)%%

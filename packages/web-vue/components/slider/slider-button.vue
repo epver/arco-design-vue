@@ -1,13 +1,22 @@
 <template>
   <tooltip
-    :popup-visible="isDragging ? true : undefined"
+    :popup-visible="popupVisible"
     :position="mergedTooltipPosition"
     :content="tooltipContent"
   >
     <div
       v-bind="$attrs"
+      tabindex="0"
+      role="slider"
+      :aria-disabled="disabled"
+      :aria-valuemax="max"
+      :aria-valuemin="min"
+      :aria-valuenow="value"
+      :aria-valuetext="tooltipContent"
       :class="cls"
       @mousedown="handleMouseDown"
+      @touchstart="handleMouseDown"
+      @contextmenu.prevent
       @click.stop
     />
   </tooltip>
@@ -35,6 +44,14 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    min: {
+      type: Number,
+      required: true,
+    },
+    max: {
+      type: Number,
+      required: true,
+    },
     formatTooltip: {
       type: Function,
     },
@@ -42,30 +59,49 @@ export default defineComponent({
     tooltipPosition: {
       type: String,
     },
+    showTooltip: {
+      type: Boolean,
+      default: true,
+    },
   },
   emits: ['movestart', 'moving', 'moveend'],
   setup(props, { emit }) {
     const prefixCls = getPrefixCls('slider-btn');
     const isDragging = ref(false);
 
-    const handleMouseDown = () => {
+    const handleMouseDown = (e: MouseEvent | TouchEvent) => {
       if (props.disabled) {
         return;
       }
+      e.preventDefault();
+
       isDragging.value = true;
       on(window, 'mousemove', handleMouseMove);
+      on(window, 'touchmove', handleMouseMove);
       on(window, 'mouseup', handleMouseUp);
+      on(window, 'contextmenu', handleMouseUp);
+      on(window, 'touchend', handleMouseUp);
       emit('movestart');
     };
 
-    const handleMouseMove = (e: MouseEvent) => {
-      emit('moving', e.clientX, e.clientY);
+    const handleMouseMove = (e: MouseEvent | TouchEvent) => {
+      let clientX: number;
+      let clientY: number;
+      if (e.type.startsWith('touch')) {
+        clientY = (e as TouchEvent).touches[0].clientY;
+        clientX = (e as TouchEvent).touches[0].clientX;
+      } else {
+        clientY = (e as MouseEvent).clientY;
+        clientX = (e as MouseEvent).clientX;
+      }
+      emit('moving', clientX, clientY);
     };
 
     const handleMouseUp = () => {
       isDragging.value = false;
       off(window, 'mousemove', handleMouseMove);
       off(window, 'mouseup', handleMouseUp);
+      off(window, 'touchend', handleMouseUp);
       emit('moveend');
     };
 
@@ -79,12 +115,16 @@ export default defineComponent({
       () => props.formatTooltip?.(props.value) ?? `${props.value}`
     );
 
+    const popupVisible = computed(() =>
+      props.showTooltip ? (isDragging.value ? true : undefined) : false
+    );
+
     return {
       prefixCls,
       cls,
       tooltipContent,
       mergedTooltipPosition,
-      isDragging,
+      popupVisible,
       handleMouseDown,
     };
   },

@@ -1,8 +1,11 @@
-import { defineComponent, PropType } from 'vue';
+import { defineComponent, inject, PropType } from 'vue';
 import { CascaderOptionInfo } from './interface';
 import { getPrefixCls } from '../_utils/global-config';
+import { configProviderInjectionKey } from '../config-provider/context';
 import Empty from '../empty';
+import Spin from '../spin';
 import CascaderOption from './cascader-option';
+import Scrollbar from '../scrollbar';
 
 export default defineComponent({
   name: 'CascaderSearchPanel',
@@ -11,56 +14,59 @@ export default defineComponent({
       type: Array as PropType<CascaderOptionInfo[]>,
       required: true,
     },
+    loading: Boolean,
+    activeKey: String,
     multiple: Boolean,
-    computedKeys: {
-      type: Array,
-    },
-    activeNode: {
-      type: Object,
-    },
+    checkStrictly: Boolean,
+    pathLabel: Boolean,
   },
-  emits: ['clickOption', 'activeChange'],
-  setup(props, { emit }) {
+  setup(props, { slots }) {
     const prefixCls = getPrefixCls('cascader');
+    const configCtx = inject(configProviderInjectionKey, undefined);
 
-    const renderEmpty = () => {
-      return <Empty />;
+    const renderContent = () => {
+      if (props.loading) {
+        return <Spin />;
+      }
+      if (props.options.length === 0) {
+        return (
+          <div class={`${prefixCls}-list-empty`}>
+            {slots.empty?.() ??
+              configCtx?.slots.empty?.({ component: 'cascader' }) ?? <Empty />}
+          </div>
+        );
+      }
+      return (
+        <ul
+          role="menu"
+          class={[
+            `${prefixCls}-list`,
+            `${prefixCls}-search-list`,
+            {
+              [`${prefixCls}-list-multiple`]: props.multiple,
+            },
+          ]}
+        >
+          {props.options.map((item) => (
+            <CascaderOption
+              key={item.key}
+              class={`${prefixCls}-search-option`}
+              option={item}
+              active={item.key === props.activeKey}
+              multiple={props.multiple}
+              checkStrictly={props.checkStrictly}
+              pathLabel={props.pathLabel}
+              searchOption
+            />
+          ))}
+        </ul>
+      );
     };
 
     return () => (
-      <div class={`${prefixCls}-panel`}>
-        {props.options.length > 0 ? (
-          <ul
-            class={[
-              `${prefixCls}-list`,
-              `${prefixCls}-search-list`,
-              {
-                [`${prefixCls}-list-multiple`]: props.multiple,
-              },
-            ]}
-          >
-            {props.options.map((item) => (
-              <CascaderOption
-                key={item.key}
-                class={`${prefixCls}-search-option`}
-                option={item}
-                computedKeys={props.computedKeys}
-                isActive={item.key === props.activeNode?.key}
-                multiple={props.multiple}
-                onClickOption={(
-                  option: CascaderOptionInfo,
-                  checked?: boolean
-                ) => emit('clickOption', option, checked)}
-                onActiveChange={(option: CascaderOptionInfo) =>
-                  emit('activeChange', option)
-                }
-              />
-            ))}
-          </ul>
-        ) : (
-          <div class={`${prefixCls}-list-empty`}>{renderEmpty()}</div>
-        )}
-      </div>
+      <Scrollbar class={[`${prefixCls}-panel`, `${prefixCls}-search-panel`]}>
+        {renderContent()}
+      </Scrollbar>
     );
   },
 });

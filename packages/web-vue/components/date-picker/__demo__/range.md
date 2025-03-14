@@ -54,23 +54,26 @@ The basic usage of RangePicker.
   <br />
   <a-range-picker
     showTime
+    :time-picker-props="{
+    defaultValue:['00:00:00','00:00:00']
+    }"
     @change="onChange"
     @select="onSelect"
     style=" width: 380px; "
   />
 </template>
 <script>
-import dayjs from 'dayjs';
 export default {
-  methods: {
-    dayjs,
-    onSelect(dateString, date) {
-      console.log('onSelect', dateString, date);
-    },
-    onChange(dateString, date) {
-      console.log('onChange: ', dateString, date);
-    },
-  }
+  setup() {
+    return {
+      onSelect(dateString, date) {
+        console.log('onSelect', dateString, date);
+      },
+      onChange(dateString, date) {
+        console.log('onChange: ', dateString, date);
+      },
+    };
+  },
 }
 </script>
 ```

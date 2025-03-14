@@ -21,10 +21,36 @@ description: The content area that can be collapsed/expanded.
 
 @import ./__demo__/accordion.md
 
+@import ./__demo__/nested.md
+
 @import ./__demo__/border-less.md
+
+@import ./__demo__/extra.md
+
+@import ./__demo__/expand-icon.md
+
+@import ./__demo__/custom.md
 
 @import ./__demo__/icon-position.md
 
+@import ./__demo__/destroy.md
+
+## API
+
 %%API(collapse.vue)%%
 
-%%API(collapse-item.vue)%%
+%%API(collapse-item.tsx)%%
+
+## FAQ
+
+## zh-CN
+### `<CollapseItem>` 组件的 `key` 属性为必填
+在 `<Collapse>` 组件中每个 `<CollapseItem>` 都需要指定唯一的 `key` 属性，`key` 对应 `activeKey` 中的值。
+
+---
+
+## en-US
+### The `key` attribute of `<CollapseItem>` components is required
+In the `<Collapse>` component, each `<CollapseItem>` needs to specify a unique `key` attribute, and the `key` corresponding to the value in `activeKey`.
+
+---

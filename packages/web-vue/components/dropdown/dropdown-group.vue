@@ -1,10 +1,10 @@
 <template>
-  <li :class="prefixCls">
-    <div :class="`${prefixCls}-title`">{{ title }}</div>
-    <ul :class="`${prefixCls}-list`">
-      <slot />
-    </ul>
+  <li :class="`${prefixCls}-title`">
+    <slot name="title">
+      {{ title }}
+    </slot>
   </li>
+  <slot />
 </template>
 
 <script lang="ts">
@@ -20,7 +20,13 @@ export default defineComponent({
      */
     title: String,
   },
-  setup(props) {
+  /**
+   * @zh 分组标题
+   * @en Group title
+   * @slot title
+   * @version 2.10.0
+   */
+  setup() {
     const prefixCls = getPrefixCls('dropdown-group');
 
     return {

@@ -20,6 +20,8 @@ description: Carousel is used to display multiple pictures, videos, or embedded 
 
 @import ./__demo__/fade.md
 
+## API
+
 
 ### `<carousel>` Props
 
@@ -27,9 +29,9 @@ description: Carousel is used to display multiple pictures, videos, or embedded 
 |---|---|---|:---:|
 |current **(v-model)**|The index of current slide which starts from 1|`number`|`-`|
 |default-current|Default index of current slide|`number`|`1`|
-|auto-play|@en* Whether to automatically loop the display, or pass in `{ interval: the time interval for switching (default: 3000),<br>hoverToPause: whether to pause switching while hover (default: true) }` for configuration (object is supported from `2.14.0`)|`boolean\|object`|`false`|
+|auto-play|@en* Whether to automatically loop the display, or pass in `{ interval: the time interval for switching (default: 3000),<br>hoverToPause: whether to pause switching while hover (default: true) }` for configuration (object is supported from `2.14.0`)|`boolean \| CarouselAutoPlayConfig`|`false`|
 |move-speed|The duration of the slide movement(ms)|`number`|`500`|
-|animation-name|The animation of the slide movement|`'slide' \| 'fade'`|`'slide'`|
+|animation-name|The animation of the slide movement|`'slide' \| 'fade' \| 'card'`|`'slide'`|
 |trigger|How to trigger the slide switch, click/hover the indicator|`'click' \| 'hover'`|`'click'`|
 |direction|The direction of the slide movement|`'horizontal' \| 'vertical'`|`'horizontal'`|
 |show-arrow|When to show the arrow used to switch|`'always' \| 'hover' \| 'never'`|`'always'`|
@@ -42,6 +44,6 @@ description: Carousel is used to display multiple pictures, videos, or embedded 
 
 |Event Name|Description|Parameters|
 |---|---|---|
-|change|Callback when slide changes|index: `number`Index of current slide<br>prevIndex: `number`Index of previous slide<br>isManual: `boolean`Whether the slide change is triggered manually|
+|change|Callback when slide changes|index: `number`<br>prevIndex: `number`<br>isManual: `boolean`|
 
 

@@ -2,9 +2,10 @@
 import React from 'react';
 // @ts-ignore
 import ReactDOM from 'react-dom';
-import Navbar from '@arco-design/arco-site-navbar';
+import Navbar from '@arco-materials/site-navbar-new';
 import { ConfigProvider } from '@arco-design/web-react';
-import '@arco-design/web-react/dist/css/index.less';
+import './index.less';
+import './navbar.css';
 
 interface NavBarOptions {
   version?: string;
@@ -23,9 +24,15 @@ const ReactApp = ({
         <Navbar
           lang={lang}
           onChangeLanguage={handleLanguageChange}
-          hideSearch
+          algoliaTag="vue"
           defaultVersion={version}
-          loginHref={`/login?redirectUrl=${window.location.href}`}
+          onChangeTheme={(theme: string) => {
+            document
+              .querySelector('#react-root')
+              ?.setAttribute('arco-theme', theme);
+          }}
+          loginHref={`/common/login?redirectUrl=${window.location.href}`}
+          hideRtl
           versions={[
             {
               version: '1.x',

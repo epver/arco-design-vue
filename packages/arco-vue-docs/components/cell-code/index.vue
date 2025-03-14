@@ -28,14 +28,24 @@
           <icon-copy />
         </a-button>
       </a-tooltip>
-      <a-tooltip :content="t('tooltip.codepen')">
+      <a-tooltip :content="t('tooltip.stackblitz')">
         <a-button
           class="cell-code-operation-btn"
           shape="circle"
           size="small"
-          @click="handleClickCodepen"
+          @click="handleClickStackblitz"
         >
-          <icon-codepen />
+          <icon-thunderbolt />
+        </a-button>
+      </a-tooltip>
+      <a-tooltip :content="t('tooltip.codeSandbox')">
+        <a-button
+          class="cell-code-operation-btn"
+          shape="circle"
+          size="small"
+          @click="handleClickCodeSandbox"
+        >
+          <icon-code-sandbox />
         </a-button>
       </a-tooltip>
     </div>
@@ -50,7 +60,8 @@ import { computed, CSSProperties, defineComponent, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { Message } from '@web-vue/components/index';
 import copy from '../../utils/clipboard';
-import { gotoCodepen } from '../../utils/codepen';
+import { openStackblitz } from '../../utils/code-stackblitz';
+import { openCodeSandbox } from '../../utils/code-sandbox';
 
 export default defineComponent({
   name: 'CellCode',
@@ -91,9 +102,15 @@ export default defineComponent({
       }
     };
 
-    const handleClickCodepen = () => {
+    const handleClickStackblitz = () => {
       if (contentRef.value?.textContent) {
-        gotoCodepen(contentRef.value.textContent);
+        openStackblitz(contentRef.value.textContent);
+      }
+    };
+
+    const handleClickCodeSandbox = () => {
+      if (contentRef.value?.textContent) {
+        openCodeSandbox(contentRef.value.textContent);
       }
     };
 
@@ -104,7 +121,8 @@ export default defineComponent({
       t,
       handleClick,
       handleClickCopy,
-      handleClickCodepen,
+      handleClickStackblitz,
+      handleClickCodeSandbox,
       contentRef,
       style,
     };

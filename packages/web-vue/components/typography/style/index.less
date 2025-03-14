@@ -6,6 +6,8 @@
 .@{typography-prefix-cls} {
   color: @typography-color-text;
   line-height: @typography-paragraph-line-height;
+  white-space: normal;
+  overflow-wrap: anywhere;
 
   // Title
   h1&,
@@ -14,8 +16,8 @@
   h4&,
   h5&,
   h6& {
-    margin-top: 1em;
-    margin-bottom: 0.5em;
+    margin-top: @typography-heading-margin-top;
+    margin-bottom: @typography-heading-margin-bottom;
     font-weight: @typography-heading-font-weight;
   }
 
@@ -194,5 +196,12 @@
     margin-top: -(@textarea-padding-vertical + @input-border-width);
     margin-right: -(@textarea-padding-horizontal + @input-border-width);
     margin-bottom: calc(1em - @textarea-padding-vertical - @input-border-width);
+  }
+
+  // css
+  &-css-operation {
+    margin-top: -1em;
+    margin-bottom: 1em;
+    text-align: right;
   }
 }

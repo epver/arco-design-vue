@@ -1,6 +1,6 @@
 ```yaml
 meta:
-  type: Development Guide
+  type: Developer Guide
 title: Dark mode
 description: The dark theme is built in the component library, and you can easily switch to dark.
 ```
@@ -18,3 +18,7 @@ document.body.setAttribute('arco-theme', 'dark')
 // Restore light theme
 document.body.removeAttribute('arco-theme');
 ```
+
+## Principle and built-in colors
+
+Refer to [Dark Mode](https://arco.design/react/docs/palette) and [Color](https://arco.design/react/docs/palette)

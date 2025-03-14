@@ -1,6 +1,6 @@
 <div align="center">
   <a href="https://arco.design" target="_blank">
-    <img alt="Arco Design Logo" width="100" src="https://avatars.githubusercontent.com/u/64576149?s=200&v=4"/>
+    <img alt="Arco Design Logo" width="200" src="https://avatars.githubusercontent.com/u/64576149?s=200&v=4"/>
   </a>
 </div>
 
@@ -49,6 +49,9 @@ npm install @arco-design/web-vue
 
 // yarn
 yarn add @arco-design/web-vue
+
+// pnpm
+pnpm add @arco-design/web-vue
 ```
 
 # 例子
@@ -64,21 +67,13 @@ app.use(ArcoVue);
 app.mount('#app');
 ```
 
-## 开发
-
-1. 使用 `npm install -g` 安装 `lerna` 和 `yarn` 等基础包
-
-2. 使用 `yarn install` 安装 `workspaces` 中各个包的依赖
-
-3. 使用 `npm run init` 初始化项目
-
-
 # 相关链接
 
 * [官网](https://arco.design/)
 * [暗黑模式](https://arco.design/vue/docs/dark)
 * [主题配置](https://arco.design/vue/docs/theme)
 * [Figma 设计资源](https://www.figma.com/file/FVu1DydEeXvJqXrkOb90Oi/ArcoDesign%E7%BB%84%E4%BB%B6%E8%AE%BE%E8%AE%A1_2.0?node-id=5472%3A308)
+* [Awesome Arco](https://github.com/arco-design/awesome-arco)
 
 # 生态
 
@@ -99,6 +94,10 @@ app.mount('#app');
 # 参与贡献
 
 贡献之前请先阅读 [行为准则](./CODE_OF_CONDUCT.md) 和 [贡献指南](./CONTRIBUTING.zh-CN.md)。
+
+感谢所有为 ArcoDesign 做过贡献的人!
+
+<a href="https://github.com/arco-design/arco-design-vue/graphs/contributors"><img src="https://contrib.rocks/image?repo=arco-design/arco-design-vue" /></a>
 
 # License
 

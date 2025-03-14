@@ -7,14 +7,20 @@
   color: inherit;
   font-style: normal;
   vertical-align: -2px;
+  outline: none;
   stroke: currentColor;
 }
 
-.@{prefix}-icon-loading, .@{prefix}-icon-spin {
+.@{prefix}-icon-loading,
+.@{prefix}-icon-spin {
   animation: ~'@{prefix}-loading-circle' @transition-duration-loading infinite @transition-timing-function-linear;
 }
 
 @keyframes ~'@{prefix}-loading-circle' {
+  0% {
+    transform: rotate(0);
+  }
+
   100% {
     transform: rotate(360deg);
   }

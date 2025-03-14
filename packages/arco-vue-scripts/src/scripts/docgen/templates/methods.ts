@@ -3,8 +3,8 @@ import { escapeCharacter } from '../utils';
 
 const paramsTmpl = (params: MethodDescriptor['params']): string => {
   return (params || [])
-    .filter((param) => param.type)
-    .map((param): string => {
+    .filter((param: any) => param.type)
+    .map((param: any): string => {
       const { name, type, description } = param;
       const res = [];
       name && res.push(name);
@@ -30,7 +30,7 @@ const returnsTmpl = (returns: MethodDescriptor['returns']): string => {
     if (!elements || !elements.length) return name || '';
 
     const names: string[] = [];
-    elements.forEach((element) => {
+    elements.forEach((element: any) => {
       names.push(getNames(element));
     });
 
@@ -44,9 +44,12 @@ const returnsTmpl = (returns: MethodDescriptor['returns']): string => {
   return res.join('');
 };
 
-const tmpl = (methods: MethodDescriptor[], lang: string): string => {
-  return methods
-    .filter((method) => method.description || lang in (method.tags ?? {}))
+const tmpl = (methods: MethodDescriptor[], lang: string) => {
+  const displayableMethods = methods.filter(
+    (method) => method.description || lang in (method.tags ?? {})
+  );
+  const hasVersion = displayableMethods.some((method) => method?.tags?.version);
+  const content = displayableMethods
     .map((method) => {
       const { name, tags } = method;
       let { description } = method;
@@ -56,28 +59,44 @@ const tmpl = (methods: MethodDescriptor[], lang: string): string => {
 
       const readableParams = paramsTmpl(method.params) || '-';
       const readableReturns = returnsTmpl(method.returns) || '-';
-      return `|${name}|${escapeCharacter(description || '')}|${escapeCharacter(
-        readableParams
-      )}|${escapeCharacter(readableReturns)}|`;
+      let lineContent = `|${name}|${escapeCharacter(
+        description || ''
+      )}|${escapeCharacter(readableParams)}|${escapeCharacter(
+        readableReturns
+      )}|`;
+
+      if (hasVersion) {
+        const version = (tags?.version?.[0] as ParamTag)?.description as string;
+        lineContent += `${version || ''}|`;
+      }
+
+      return lineContent;
     })
     .join('\n');
+
+  return {
+    hasVersion,
+    content,
+  };
 };
 
-export default (methods: MethodDescriptor[], lang:string) => {
-  const content = tmpl(methods,lang);
+export default (methods: MethodDescriptor[], lang: string) => {
+  const { content, hasVersion } = tmpl(methods, lang);
   if (!content) return '';
 
-  if (lang === 'en') {
-    return `
-|Method|Description|Parameters|Return|
-|---|---|---|:---:|
-${content}
-`;
+  const header =
+    lang === 'en'
+      ? ['|Method|Description|Parameters|Return|', '|---|---|---|:---:|']
+      : ['|方法名|描述|参数|返回值|', '|---|---|---|---|'];
+
+  if (hasVersion) {
+    header[0] += lang === 'en' ? 'version|' : '版本|';
+    header[1] += ':---|';
   }
 
   return `
-|方法名|描述|参数|返回值|
-|---|---|---|---|
+${header[0]}
+${header[1]}
 ${content}
 `;
 };

@@ -8,7 +8,7 @@
   box-sizing: border-box;
   min-height: 60px;
   overflow: hidden;
-  background-color: var(--color-bg-popup);
+  background-color: var(~'@{arco-cssvars-prefix}-color-bg-popup');
   border: 1px solid @picker-panel-color-border;
   border-radius: @picker-container-border-radius;
   box-shadow: @popup-box-shadow-base;
@@ -48,15 +48,15 @@
 }
 
 // panel only
-.@{prefix}-picker-panel-only,
-.@{prefix}-picker-range-panel-only {
+.@{prefix}-picker-container-panel-only,
+.@{prefix}-picker-range-container-panel-only {
   box-shadow: none;
 }
-.@{prefix}-picker-panel-only .@{prefix}-panel-date-inner,
-.@{prefix}-picker-range-panel-only .@{prefix}-panel-date-inner {
+.@{prefix}-picker-container-panel-only .@{prefix}-panel-date-inner,
+.@{prefix}-picker-range-container-panel-only .@{prefix}-panel-date-inner {
   width: 100%;
 }
-.@{prefix}-picker-range-panel-only .@{prefix}-panel-date {
+.@{prefix}-picker-range-container-panel-only .@{prefix}-panel-date {
   width: 100%;
 }
 
@@ -68,7 +68,7 @@
 
     &-title {
       flex: 1;
-      color: var(--color-text-1);
+      color: var(~'@{arco-cssvars-prefix}-color-text-1');
       font-size: 14px;
       line-height: 24px;
       text-align: center;
@@ -94,6 +94,17 @@
 
       &:hover {
         background-color: @picker-color-bg-switch-icon_hover;
+      }
+    }
+
+    &-label {
+      padding: 2px;
+      border-radius: 2px;
+      cursor: pointer;
+      transition: all @transition-duration-1;
+
+      &:hover {
+        background-color: @picker-panel-color-bg-label_hover;
       }
     }
   }
@@ -262,7 +273,7 @@
     &-extra-wrapper {
       box-sizing: border-box;
       padding: 8px 24px;
-      color: var(--color-text-1);
+      color: var(~'@{arco-cssvars-prefix}-color-text-1');
       font-size: 12px;
       border-top: 1px solid @picker-panel-color-border;
     }

@@ -1,13 +1,4 @@
-import {
-  computed,
-  defineComponent,
-  onMounted,
-  onUnmounted,
-  PropType,
-  toRef,
-  toRefs,
-} from 'vue';
-import { SubMenuProps } from './interface';
+import { computed, defineComponent, PropType, toRef, toRefs } from 'vue';
 import SubMenuInline from './sub-menu-inline.vue';
 import SubMenuPop from './sub-menu-pop.vue';
 import useMenu from './hooks/use-menu';
@@ -15,17 +6,11 @@ import useLevel from './hooks/use-level';
 import IconDown from '../icon/icon-down';
 import IconRight from '../icon/icon-right';
 import useMenuContext from './hooks/use-menu-context';
+import useMenuDataCollector from './hooks/use-menu-data-collector';
 
 export default defineComponent({
   name: 'SubMenu',
   props: {
-    /**
-     * @zh 唯一标志
-     * @en Unique key
-     */
-    key: {
-      type: String,
-    },
     /**
      * @zh 子菜单的标题
      * @en The title of the submenu
@@ -45,10 +30,28 @@ export default defineComponent({
      * @en Whether to force the use of pop-up mode, `level` indicates the level of the current submenu
      */
     popup: {
-      type: Boolean as PropType<SubMenuProps['popup']>,
+      type: [Boolean, Function] as PropType<
+        boolean | ((level: number) => boolean)
+      >,
       default: false,
     },
+    /**
+     * @zh 弹出框的最大高度
+     * @en The maximum height of popover
+     * @defaultValue true
+     * @version 2.23.0
+     */
+    popupMaxHeight: {
+      type: [Boolean, Number] as PropType<boolean | number>,
+      default: undefined,
+    },
   },
+  /**
+   * @zh 菜单的图标
+   * @en the icon of menu item
+   * @slot icon
+   * @version 2.11.0
+   */
   /**
    * @zh 向下展开的图标
    * @en Icon expand down
@@ -64,7 +67,7 @@ export default defineComponent({
    * @en Title
    * @slot title
    */
-  setup(props: SubMenuProps, { attrs }) {
+  setup(props, { attrs }) {
     const { key } = useMenu();
     const { level } = useLevel();
     const { popup } = toRefs(props);
@@ -77,15 +80,32 @@ export default defineComponent({
       return forcePopup || collapsed || inTrigger || mode !== 'vertical';
     });
 
-    onMounted(() => {
-      menuContext.collectSubMenuKey && menuContext.collectSubMenuKey(key.value);
+    const { subMenuKeys, menuItemKeys } = useMenuDataCollector({
+      key: key.value,
+      type: 'subMenu',
     });
 
-    onUnmounted(() => {
-      menuContext.removeSubMenuKey && menuContext.removeSubMenuKey(key.value);
+    const isChildrenSelected = computed(() => {
+      const selectedKeys = menuContext.selectedKeys || [];
+      const checkSelected = (menuKeys: string[]) => {
+        for (let i = 0; i < selectedKeys.length; i++) {
+          const selectedKey = selectedKeys[i];
+          if (menuKeys.includes(selectedKey)) {
+            return true;
+          }
+        }
+        return false;
+      };
+
+      return (
+        checkSelected(subMenuKeys.value) || checkSelected(menuItemKeys.value)
+      );
     });
 
     return {
+      subMenuKeys,
+      menuItemKeys,
+      isChildrenSelected,
       props,
       attrs,
       computedKey: key,
@@ -102,27 +122,37 @@ export default defineComponent({
       computedPopup,
       expandIconDown,
       expandIconRight,
+      isChildrenSelected,
     } = this;
-    const _props = {
-      ...props,
-      ...attrs,
-      key: computedKey,
-    };
     const _slots = {
       ...this.$slots,
       'expand-icon-down':
         this.$slots['expand-icon-down'] ||
         expandIconDown ||
-        (() => <IconDown />),
+        (() => [<IconDown />]),
       'expand-icon-right':
         this.$slots['expand-icon-right'] ||
         expandIconRight ||
-        (() => <IconRight />),
+        (() => [<IconRight />]),
     };
     return computedPopup ? (
-      <SubMenuPop {..._props} v-slots={_slots} />
+      <SubMenuPop
+        key={computedKey}
+        title={props.title}
+        selectable={props.selectable}
+        isChildrenSelected={isChildrenSelected}
+        popupMaxHeight={props.popupMaxHeight}
+        v-slots={_slots}
+        {...attrs}
+      />
     ) : (
-      <SubMenuInline {..._props} v-slots={_slots} />
+      <SubMenuInline
+        key={computedKey}
+        title={props.title}
+        isChildrenSelected={isChildrenSelected}
+        v-slots={_slots}
+        {...attrs}
+      />
     );
   },
 });

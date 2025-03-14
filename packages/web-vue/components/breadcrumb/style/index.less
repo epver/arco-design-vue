@@ -5,11 +5,11 @@
 .@{breadcrumb-prefix-cls} {
   display: inline-flex;
   align-items: center;
-  color: var(--color-text-2);
+  color: var(~'@{arco-cssvars-prefix}-color-text-2');
   font-size: @breadcrumb-size-font-size;
 
   &-icon {
-    color: var(--color-text-2);
+    color: var(~'@{arco-cssvars-prefix}-color-text-2');
   }
 
   &-item {
@@ -27,9 +27,10 @@
       display: inline-block;
       margin: 0 -@breadcrumb-padding-text-horizontal;
       padding: 0 @breadcrumb-padding-text-horizontal;
-      color: inherit;
+      color: @breadcrumb-color-link-text;
       text-decoration: none;
       border-radius: @breadcrumb-border-text-radius_hover;
+      background-color: @breadcrumb-color-bg;
 
       &:hover {
         color: @breadcrumb-color-link-text_hover;
@@ -47,7 +48,7 @@
       top: -3px;
       display: inline-block;
       padding: 0 @breadcrumb-padding-text-horizontal;
-      color: var(--color-text-2);
+      color: var(~'@{arco-cssvars-prefix}-color-text-2');
     }
 
     &-separator {

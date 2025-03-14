@@ -4,7 +4,40 @@ import { isString } from './is';
 export const NOOP = () => {
   return undefined;
 };
+export interface Size {
+  height: number;
+  width: number;
+}
+export const getDocumentSize = (): Size => {
+  const { body } = document;
+  const html = document.documentElement;
+  let topBody;
+  try {
+    const topWindow = window.top || window.self || window;
+    topBody = topWindow.document.body;
+  } catch {}
 
+  return {
+    height: Math.max(
+      body.scrollHeight,
+      body.offsetHeight,
+      html.clientHeight,
+      html.scrollHeight,
+      html.offsetHeight,
+      topBody?.scrollHeight || 0,
+      topBody?.clientHeight || 0
+    ),
+    width: Math.max(
+      body.scrollWidth,
+      body.offsetWidth,
+      html.clientWidth,
+      html.scrollWidth,
+      html.offsetWidth,
+      topBody?.scrollWidth || 0,
+      topBody?.clientWidth || 0
+    ),
+  };
+};
 export const isServerRendering = (() => {
   try {
     return !(typeof window !== 'undefined' && document !== undefined);
@@ -57,7 +90,10 @@ export const findDomNode = (vnode: VNode) => {
   return node as HTMLElement;
 };
 
-export const contains = (root: Node, ele: Node) => {
+export const contains = (root: Node | null | undefined, ele: Node | null) => {
+  if (!root || !ele) {
+    return false;
+  }
   let node: Node | null = ele;
   while (node) {
     if (node === root) {
@@ -68,7 +104,12 @@ export const contains = (root: Node, ele: Node) => {
   return false;
 };
 
-export const OVERLAY_TYPES = ['modal', 'message', 'notification'] as const;
+export const OVERLAY_TYPES = [
+  'modal',
+  'message',
+  'notification',
+  'drawer',
+] as const;
 
 export const getOverlay = (type: typeof OVERLAY_TYPES[number]) => {
   const popper = document.createElement('div');
@@ -76,16 +117,27 @@ export const getOverlay = (type: typeof OVERLAY_TYPES[number]) => {
   return popper;
 };
 
-export const querySelector = (selectors: string) => {
+export const querySelector = (
+  selectors: string,
+  container?: Document | HTMLElement
+) => {
   if (isServerRendering) {
     return NOOP();
   }
-  return document.querySelector(selectors) as HTMLElement | undefined | null;
+  return (
+    (container ?? document).querySelector<HTMLElement>(selectors) ?? undefined
+  );
 };
 
-export const getElement = (target: string | HTMLElement | undefined | null) => {
-  if (isString(target)) return querySelector(target);
-  return target || undefined;
+export const getElement = (
+  target: string | HTMLElement | undefined,
+  container?: Document | HTMLElement
+): HTMLElement | undefined => {
+  if (isString(target)) {
+    const selector = target[0] === '#' ? `[id='${target.slice(1)}']` : target;
+    return querySelector(selector, container);
+  }
+  return target;
 };
 
 /**
@@ -107,9 +159,14 @@ export const getRelativeRect = (target: HTMLElement, relative: HTMLElement) => {
   };
 };
 
+export const isScroll = (element: HTMLElement) => {
+  return element.tagName === 'BODY'
+    ? document.documentElement.scrollHeight > window.innerHeight
+    : element.scrollHeight > element.offsetHeight;
+};
+
 export const getScrollBarWidth = (element: HTMLElement) => {
   return element.tagName === 'BODY'
-    ? window.innerWidth -
-        (document.documentElement.offsetWidth || document.body.offsetWidth)
+    ? window.innerWidth - getDocumentSize().width
     : element.offsetWidth - element.clientWidth;
 };

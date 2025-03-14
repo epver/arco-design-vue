@@ -27,6 +27,14 @@ description: The basic layout framework of the page is often used nested with co
 
 @import ./__demo__/resize.md
 
+## API
+
 %%API(layout.vue)%%
+
+%%API(header.vue)%%
+
+%%API(content.vue)%%
+
+%%API(footer.vue)%%
 
 %%API(sider.vue)%%

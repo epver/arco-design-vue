@@ -1,14 +1,23 @@
 <template>
   <div
+    role="progressbar"
+    aria-valuemin="0"
+    aria-valuemax="100"
+    :aria-valuenow="percent"
     :class="`${prefixCls}-wrapper`"
     :style="{ width: `${mergedWidth}px`, height: `${mergedWidth}px` }"
   >
+    <icon-check
+      v-if="type === 'circle' && size === 'mini' && status === 'success'"
+      :style="{ fontSize: mergedWidth - 2, color }"
+    />
     <svg
+      v-else
       :viewBox="`0 0 ${mergedWidth} ${mergedWidth}`"
       :class="`${prefixCls}-svg`"
     >
       <defs v-if="isLinearGradient">
-        <linearGradient id="linearGradientId" x1="0" y1="1" x2="0" y2="0">
+        <linearGradient :id="linearGradientId" x1="0" y1="1" x2="0" y2="0">
           <stop
             v-for="key of Object.keys(color)"
             :key="key"
@@ -25,7 +34,7 @@
         :r="radius"
         :stroke-width="mergedPathStrokeWidth"
         :style="{
-          stroke: pathStrokeColor,
+          stroke: trackColor,
         }"
       />
       <circle
@@ -36,7 +45,7 @@
         :r="radius"
         :stroke-width="mergedStrokeWidth"
         :style="{
-          stroke: color,
+          stroke: isLinearGradient ? `url(#${linearGradientId})` : color,
           strokeDasharray: perimeter,
           strokeDashoffset: (percent >= 1 ? 0 : 1 - percent) * perimeter,
         }"
@@ -44,8 +53,11 @@
     </svg>
     <div v-if="showText && size !== 'mini'" :class="`${prefixCls}-text`">
       <slot name="text" :percent="percent">
-        {{ `${percent * 100}%` }}
-        <icon-exclamation-circle-fill v-if="status === 'danger'" />
+        <icon-exclamation v-if="status === 'danger'" />
+        <icon-check v-else-if="status === 'success'" />
+        <template v-else>
+          {{ text }}
+        </template>
       </slot>
     </div>
   </div>
@@ -53,10 +65,14 @@
 
 <script lang="ts">
 import { computed, defineComponent, PropType } from 'vue';
+import NP from 'number-precision';
 import { getPrefixCls } from '../_utils/global-config';
 import { isObject } from '../_utils/is';
 import { SIZES } from '../_utils/constant';
-import IconExclamationCircleFill from '../icon/icon-exclamation-circle-fill';
+import IconExclamation from '../icon/icon-exclamation';
+import IconCheck from '../icon/icon-check';
+
+let __ARCO_PROGRESS_SEED = 0;
 
 const DEFAULT_WIDTH = {
   mini: 16,
@@ -75,7 +91,8 @@ const DEFAULT_STROKE_WIDTH = {
 export default defineComponent({
   name: 'ProgressCircle',
   components: {
-    IconExclamationCircleFill,
+    IconExclamation,
+    IconCheck,
   },
   props: {
     percent: {
@@ -100,6 +117,7 @@ export default defineComponent({
       type: [String, Object],
       default: undefined,
     },
+    trackColor: String,
     status: {
       type: String,
       default: undefined,
@@ -110,9 +128,6 @@ export default defineComponent({
     },
     pathStrokeWidth: {
       type: Number,
-    },
-    pathStrokeColor: {
-      type: String,
     },
   },
   setup(props) {
@@ -146,15 +161,24 @@ export default defineComponent({
     const perimeter = computed(() => Math.PI * 2 * radius.value);
     const center = computed(() => mergedWidth.value / 2);
 
+    const linearGradientId = computed(() => {
+      __ARCO_PROGRESS_SEED += 1;
+      return `${prefixCls}-linear-gradient-${__ARCO_PROGRESS_SEED}`;
+    });
+
+    const text = computed(() => `${NP.times(props.percent, 100)}%`);
+
     return {
       prefixCls,
       isLinearGradient,
       radius,
+      text,
       perimeter,
       center,
       mergedWidth,
       mergedStrokeWidth,
       mergedPathStrokeWidth,
+      linearGradientId,
     };
   },
 });

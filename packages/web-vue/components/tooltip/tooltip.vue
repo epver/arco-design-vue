@@ -1,5 +1,5 @@
 <template>
-  <trigger
+  <Trigger
     :class="prefixCls"
     trigger="hover"
     :position="position"
@@ -11,20 +11,23 @@
     :arrow-class="arrowCls"
     :arrow-style="computedArrowStyle"
     :popup-container="popupContainer"
+    animation-name="zoom-in-fade-out"
+    auto-fit-transform-origin
+    role="tooltip"
     @popup-visible-change="handlePopupVisibleChange"
   >
     <slot />
     <template #content>
       <slot name="content">{{ content }}</slot>
     </template>
-  </trigger>
+  </Trigger>
 </template>
 
 <script lang="ts">
 import type { PropType } from 'vue';
 import { computed, CSSProperties, defineComponent, ref } from 'vue';
 import { getPrefixCls } from '../_utils/global-config';
-import { TRIGGER_POSITIONS, TriggerPosition } from '../_utils/constant';
+import { TriggerPosition } from '../_utils/constant';
 import Trigger from '../trigger';
 import { ClassName } from '../_utils/types';
 
@@ -64,9 +67,6 @@ export default defineComponent({
     position: {
       type: String as PropType<TriggerPosition>,
       default: 'top',
-      validator: (value: any) => {
-        return TRIGGER_POSITIONS.includes(value);
-      },
     },
     /**
      * @zh 是否展示为迷你尺寸
@@ -76,6 +76,10 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    /**
+     * @zh 弹出框的背景颜色
+     * @en Background color of the popover
+     */
     backgroundColor: {
       type: String,
     },
@@ -112,19 +116,18 @@ export default defineComponent({
      * @en Mount container for popup
      */
     popupContainer: {
-      type: [String, Object] as PropType<
-        string | HTMLElement | null | undefined
-      >,
+      type: [String, Object] as PropType<string | HTMLElement>,
     },
   },
-  emits: [
-    'update:popupVisible',
+  emits: {
+    'update:popupVisible': (visible: boolean) => true,
     /**
      * @zh 文字气泡显示状态改变时触发
      * @en Emitted when the tooltip display status changes
+     * @param {boolean} visible
      */
-    'popupVisibleChange',
-  ],
+    'popupVisibleChange': (visible: boolean) => true,
+  },
   /**
    * @zh 内容
    * @en Content

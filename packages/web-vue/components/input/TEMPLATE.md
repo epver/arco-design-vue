@@ -33,9 +33,13 @@ description: Basic form components have been expanded on the basis of native con
 
 @import ./__demo__/search.md
 
+@import ./__demo__/search-button.md
+
 @import ./__demo__/search-loading.md
 
 @import ./__demo__/password.md
+
+## API
 
 %%API(input.tsx)%%
 
@@ -43,4 +47,4 @@ description: Basic form components have been expanded on the basis of native con
 
 %%API(input-password.vue)%%
 
-%%API(input-search.vue)%%
+%%API(input-search.tsx)%%

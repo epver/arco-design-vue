@@ -12,6 +12,10 @@ description: 鼠标悬停、聚焦或点击在某个组件时，弹出的气泡�
 
 @import ./__demo__/position.md
 
+`<popover>` 组件继承 `<trigger>` 组件的全部属性
+
+## API
+
 
 ### `<popover>` Props
 
@@ -27,7 +31,7 @@ description: 鼠标悬停、聚焦或点击在某个组件时，弹出的气泡�
 |content-style|弹出框内容的样式|`CSSProperties`|`-`|
 |arrow-class|弹出框箭头的类名|`ClassName`|`-`|
 |arrow-style|弹出框箭头的样式|`CSSProperties`|`-`|
-|popup-container|弹出框的挂载容器|`string \| HTMLElement \| null \| undefined`|`-`|
+|popup-container|弹出框的挂载容器|`string \| HTMLElement`|`-`|
 ### `<popover>` Events
 
 |事件名|描述|参数|

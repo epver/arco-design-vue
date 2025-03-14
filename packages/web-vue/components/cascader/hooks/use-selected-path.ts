@@ -4,52 +4,77 @@ import { CascaderOptionInfo } from '../interface';
 export const useSelectedPath = (
   options: Ref<CascaderOptionInfo[]>,
   {
+    optionMap,
     filteredLeafOptions,
     showSearchPanel,
+    expandChild,
   }: {
+    optionMap: Map<string, CascaderOptionInfo>;
     filteredLeafOptions: ComputedRef<CascaderOptionInfo[]>;
-    showSearchPanel: ComputedRef<boolean>;
+    showSearchPanel?: ComputedRef<boolean>;
+    expandChild: Ref<boolean>;
   }
 ) => {
-  // 当前选中的路径
-  const selectedPath = ref<CascaderOptionInfo[]>([]);
-  // 当前选中的选项
-  const activeNode = ref<CascaderOptionInfo>();
+  // active node key
+  const activeKey = ref<string>();
+  const activeOption = computed(() => {
+    if (activeKey.value) return optionMap.get(activeKey.value);
+    return undefined;
+  });
+
+  // selected nodes key
+  const selectedPath = ref<string[]>([]);
+
   const displayColumns = computed(() => {
     const columns: CascaderOptionInfo[][] = [options.value];
-    for (const item of selectedPath.value) {
-      if (item.children) {
-        columns.push(item.children);
+    for (const key of selectedPath.value) {
+      const option = optionMap.get(key);
+      if (option?.children) {
+        columns.push(option.children);
       }
     }
     return columns;
   });
 
-  const setSelectedPath = (option?: CascaderOptionInfo) => {
-    selectedPath.value = option?.path ?? [];
+  const setSelectedPath = (key?: string) => {
+    const option = getTargetOption(key);
+    selectedPath.value = option?.path.map((item) => item.key) ?? [];
   };
 
-  const setActiveNode = (node?: CascaderOptionInfo) => {
-    activeNode.value = node;
+  const setActiveKey = (key?: string) => {
+    activeKey.value = key;
   };
 
   const enabledOptions = computed(() => {
-    if (showSearchPanel.value) {
+    if (showSearchPanel?.value) {
       return filteredLeafOptions.value.filter((item) => !item.disabled);
     }
-    if (activeNode.value && activeNode.value.parent) {
-      return activeNode.value.parent.children?.filter((item) => !item.disabled);
+    if (activeOption.value && activeOption.value.parent) {
+      return activeOption.value.parent.children?.filter(
+        (item) => !item.disabled
+      );
     }
     return options.value.filter((item) => !item.disabled);
   });
 
+  const getTargetOption = (key?: string) => {
+    let target = key ? optionMap.get(key) : undefined;
+    if (expandChild.value) {
+      while (target && target.children && target.children.length > 0) {
+        // eslint-disable-next-line prefer-destructuring
+        target = target.children[0];
+      }
+    }
+    return target;
+  };
+
   const getNextActiveNode = (direction: 'next' | 'preview') => {
     const _length = enabledOptions.value?.length ?? 0;
 
-    if (activeNode.value) {
+    if (activeKey.value) {
       const enabledIndex =
         enabledOptions.value?.findIndex(
-          (item) => item.key === activeNode.value?.key
+          (item) => item.key === activeKey.value
         ) ?? 0;
       if (direction === 'next') {
         return enabledOptions.value?.[(_length + enabledIndex + 1) % _length];
@@ -61,11 +86,12 @@ export const useSelectedPath = (
   };
 
   return {
+    activeKey,
+    activeOption,
     selectedPath,
-    activeNode,
     displayColumns,
+    setActiveKey,
     setSelectedPath,
-    setActiveNode,
     getNextActiveNode,
   };
 };

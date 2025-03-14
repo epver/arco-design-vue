@@ -18,6 +18,8 @@ description: 用于展示标题、段落、文本内容。
 
 @import ./__demo__/ellipsis.md
 
+## API
+
 
 
 
@@ -25,32 +27,35 @@ description: 用于展示标题、段落、文本内容。
 
 ### `Common` Props
 
-|参数名|描述|类型|默认值|
-|---|---|---|:---:|
-|type|文本类型|`'primary' \| 'secondary' \| 'success' \| 'danger' \| 'warning'`|`-`|
-|bold|粗体|`boolean`|`false`|
-|mark|添加标记样式|`boolean \| { color: string }`|`false`|
-|underline|下划线样式|`boolean`|`false`|
-|delete|删除线样式|`boolean`|`false`|
-|code|代码块样式|`boolean`|`false`|
-|disabled|禁用状态|`boolean`|`false`|
-|editable|开启可编辑功能|`boolean`|`false`|
-|editing **(v-model)**|是否在编辑状态|`boolean`|`-`|
-|default-editing|默认的编辑状态|`boolean`|`false`|
-|edit-text **(v-model)**|编辑的文字|`string`|`-`|
-|copyable|开启复制功能|`boolean`|`false`|
-|copy-text|复制的文字|`string`|`-`|
-|ellipsis|自动溢出省略，具体参数配置看 [EllipsisConfig](#ellipsisconfig)|`boolean \| EllipsisConfig`|`false`|
+|参数名|描述|类型|默认值|版本|
+|---|---|---|:---:|:---|
+|type|文本类型|`'primary' \| 'secondary' \| 'success' \| 'danger' \| 'warning'`|`-`||
+|bold|粗体|`boolean`|`false`||
+|mark|添加标记样式|`boolean \| { color: string }`|`false`||
+|underline|下划线样式|`boolean`|`false`||
+|delete|删除线样式|`boolean`|`false`||
+|code|代码块样式|`boolean`|`false`||
+|disabled|禁用状态|`boolean`|`false`||
+|editable|开启可编辑功能|`boolean`|`false`||
+|editing **(v-model)**|是否在编辑状态|`boolean`|`-`||
+|default-editing|默认的编辑状态|`boolean`|`false`||
+|edit-text **(v-model)**|编辑的文字|`string`|`-`||
+|copyable|开启复制功能|`boolean`|`false`||
+|copy-text|复制的文字|`string`|`-`||
+|copy-delay|复制成功后，复制按钮恢复到可点击状态的延迟时间，单位是毫秒|`number`|`3000`|2.16.0|
+|ellipsis|自动溢出省略，具体参数配置看 [EllipsisConfig](#EllipsisConfig)|`boolean \| EllipsisConfig`|`false`||
+|edit-tooltip-props|编辑按钮问题提示配置|`object`|`-`|2.32.0|
+|copy-tooltip-props|拷贝按钮问题提示配置|`object`|`-`|2.32.0|
 ### `Common` Events
 
 |事件名|描述|参数|
 |---|---|---|
 |edit-start|开始编辑|-|
-|change|编辑内容变化|-|
-|edit-end|编辑结束|text: `string`Edited text|
-|copy|复制|text: `string`Copied text|
-|ellipsis|省略变化事件|isEllipsis: `boolean`Ellipsis state|
-|expand|展开收起事件|expanded: `boolean`Expand state|
+|change|编辑内容变化|text: `string`|
+|edit-end|编辑结束|-|
+|copy|复制|text: `string`|
+|ellipsis|省略变化事件|isEllipsis: `boolean`|
+|expand|展开收起事件|expanded: `boolean`|
 ### `Common` Slots
 
 |插槽名|描述|参数|
@@ -87,12 +92,13 @@ description: 用于展示标题、段落、文本内容。
 
 ### EllipsisConfig
 
-|参数名|描述|类型|默认值|
-|---|---|---|:---:|
-|rows|显示省略的行数|`number`|`1`|
-|expandable|是否支持展开/折叠|`boolean`|`false`|
-|ellipsisStr|省略号|`string`|`'...'`|
-|suffix|后缀|`string`|`-`|
-|showTooltip|配置省略时的弹出框|`boolean    \| { type: 'tooltip' \| 'popover'; props: Record<string, any> }`|`false`|
+|参数名|描述|类型|默认值|版本|
+|---|---|---|:---:|:---|
+|rows|显示省略的行数|`number`|`1`||
+|expandable|是否支持展开/折叠|`boolean`|`false`||
+|ellipsisStr|省略号|`string`|`'...'`||
+|suffix|后缀|`string`|`-`||
+|showTooltip|配置省略时的弹出框|`boolean    \| { type: 'tooltip' \| 'popover'; props: Record<string, any> }`|`false`||
+|css|是否使用 CSS 省略（此模式暂不支持展开、自定义省略号和后缀）|`boolean`|`false`|2.37.0|
 
 

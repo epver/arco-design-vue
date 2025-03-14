@@ -4,7 +4,9 @@
 
 .@{btn-prefix-cls} {
   position: relative;
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   box-sizing: border-box;
   font-weight: @btn-font-weight;
   line-height: @line-height-base;
@@ -24,29 +26,35 @@
   }
 
   &-long {
-    display: block;
+    display: flex;
     width: 100%;
   }
 
   &-link {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     text-decoration: none;
 
     &:not([href]) {
-      color: var(--color-text-4);
+      color: var(~'@{arco-cssvars-prefix}-color-text-4');
     }
 
     &:hover {
       text-decoration: none;
     }
 
-    &.@{btn-prefix-cls}-icon-only {
+    &.@{btn-prefix-cls}-only-icon {
       display: inline-flex;
       align-items: center;
       justify-content: center;
       vertical-align: top;
     }
+  }
+
+  &.@{btn-prefix-cls}-only-icon .@{btn-prefix-cls}-icon {
+    display: flex;
+    justify-content: center;
   }
 
   &-loading {
@@ -88,13 +96,19 @@
     border: @btn-size-default-border-width ~'@{btn-@{type}-border-style}' ~'@{btn-@{type}-color-border}';
   }
 
-  .@{btn-prefix-cls}-@{type} {
+  .@{btn-prefix-cls}-@{type},
+  .@{btn-prefix-cls}-@{type}[type='button'],
+  .@{btn-prefix-cls}-@{type}[type='submit'] {
     .normal();
 
     &:hover {
       color: ~'@{btn-@{type}-color-text_hover}';
       background-color: ~'@{btn-@{type}-color-bg_hover}';
       border-color: ~'@{btn-@{type}-color-border_hover}';
+    }
+
+    &:focus-visible {
+      box-shadow: 0 0 0 @btn-box-shadow-radius ~'@{btn-@{type}-color-box-shadow}';
     }
 
     &:active {
@@ -132,6 +146,10 @@
       border-color: ~'@{btn-@{type}-color-border_@{status}_hover}';
     }
 
+    &:focus-visible {
+      box-shadow: 0 0 0 @btn-box-shadow-radius ~'@{btn-color-box-shadow_@{status}}';
+    }
+
     &:active {
       color: ~'@{btn-@{type}-color-text_@{status}_active}';
       background-color: ~'@{btn-@{type}-color-bg_@{status}_active}';
@@ -152,12 +170,13 @@
 
 .btn-size(@size) {
   @size-type: ~'size-@{size}';
+  @size-height: ~'btn-size-@{size}-height';
   @bsp: ~'btn-@{size-type}-padding-horizontal';
   @bsf: ~'btn-@{size-type}-font-size';
   @bss: ~'btn-@{size-type}-icon-spacing';
 
   .@{btn-prefix-cls}-@{size-type} {
-    height: @@size-type;
+    height: @@size-height;
     padding: 0 @@bsp;
     font-size: @@bsf;
     border-radius: ~'@{btn-@{size-type}-radius}';
@@ -227,7 +246,8 @@
 
 // 按钮组样式
 .@{btn-prefix-cls}-group {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
 
   .@{btn-prefix-cls}-outline:not(:first-child),
   .@{btn-prefix-cls}-dashed:not(:first-child) {

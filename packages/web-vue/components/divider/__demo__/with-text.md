@@ -25,8 +25,10 @@ Use `orientation` to add descriptive text to Divider.
     <a-divider orientation="center">Text</a-divider>
     <p>A design is a plan or specification for the construction of an object.</p>
     <a-divider orientation="right">Text</a-divider>
+    <a-divider :margin="10"><icon-star /></a-divider>
   </div>
 </template>
+
 <style scoped>
 .divider-demo {
   box-sizing: border-box;

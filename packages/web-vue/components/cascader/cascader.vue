@@ -1,24 +1,33 @@
 <template>
   <trigger
+    v-bind="triggerProps"
     trigger="click"
+    animation-name="slide-dynamic-origin"
+    auto-fit-transform-origin
     :popup-visible="computedPopupVisible"
     position="bl"
-    :disabled="disabled"
+    :disabled="mergedDisabled"
     :popup-offset="4"
     :auto-fit-popup-width="showSearchPanel"
     :popup-container="popupContainer"
+    :prevent-focus="true"
+    :click-to-close="!allowSearch"
     @popup-visible-change="handlePopupVisibleChange"
   >
     <select-view
       :model-value="selectViewValue"
       :input-value="computedInputValue"
-      :disabled="disabled"
+      :disabled="mergedDisabled"
       :error="error"
       :multiple="multiple"
       :allow-clear="allowClear"
       :allow-search="allowSearch"
+      :size="size"
       :opened="computedPopupVisible"
       :placeholder="placeholder"
+      :loading="loading"
+      :max-tag-count="maxTagCount"
+      :tag-nowrap="tagNowrap"
       v-bind="$attrs"
       @input-value-change="handleInputValueChange"
       @clear="handleClear"
@@ -26,53 +35,102 @@
       @blur="handleBlur"
       @remove="handleRemove"
       @keydown="handleKeyDown"
-    />
+    >
+      <template v-if="$slots.label" #label="data">
+        <slot name="label" v-bind="data" />
+      </template>
+      <template v-if="$slots.prefix" #prefix>
+        <slot name="prefix" />
+      </template>
+      <template v-if="$slots['arrow-icon']" #arrow-icon>
+        <slot name="arrow-icon" />
+      </template>
+      <template v-if="$slots['loading-icon']" #loading-icon>
+        <slot name="loading-icon" />
+      </template>
+      <template v-if="$slots['search-icon']" #search-icon>
+        <slot name="search-icon" />
+      </template>
+    </select-view>
     <template #content>
       <cascader-search-panel
         v-if="showSearchPanel"
         :options="filteredLeafOptions"
-        :active-node="activeNode"
-        :computed-keys="computedKeys"
+        :active-key="activeKey"
         :multiple="multiple"
-        @click-option="handleClickOption"
-        @active-change="setActiveNode"
-      />
-      <cascader-panel
+        :check-strictly="checkStrictly"
+        :loading="loading"
+        :path-label="!searchOptionOnlyLabel"
+      >
+        <template v-if="$slots.empty" #empty>
+          <slot name="empty" />
+        </template>
+      </cascader-search-panel>
+      <base-cascader-panel
         v-else
         :display-columns="displayColumns"
         :selected-path="selectedPath"
-        :active-node="activeNode"
-        :computed-keys="computedKeys"
+        :active-key="activeKey"
         :multiple="multiple"
-        :expand-trigger="expandTrigger"
-        @click-option="handleClickOption"
-        @active-change="setActiveNode"
-        @path-change="setSelectedPath"
-      />
+        :total-level="totalLevel"
+        :check-strictly="checkStrictly"
+        :loading="loading"
+        :virtual-list-props="virtualListProps"
+        dropdown
+      >
+        <template v-if="$slots.empty" #empty>
+          <slot name="empty" />
+        </template>
+      </base-cascader-panel>
     </template>
   </trigger>
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, PropType, ref, toRefs, watch } from 'vue';
-import { getKeysFromValue, getLeafOptionKeys, getOptionInfos } from './utils';
-import Trigger from '../trigger';
+import {
+  computed,
+  defineComponent,
+  PropType,
+  provide,
+  reactive,
+  ref,
+  toRefs,
+  watch,
+} from 'vue';
+import {
+  getCheckedStatus,
+  getLeafOptionInfos,
+  getLeafOptionKeys,
+  getOptionInfos,
+  getOptionLabel,
+  getValidValues,
+  getValueKey,
+} from './utils';
+import Trigger, { TriggerProps } from '../trigger';
 import SelectView from '../_components/select-view/select-view';
-import CascaderPanel from './cascader-panel';
+import BaseCascaderPanel from './base-cascader-panel';
 import CascaderSearchPanel from './cascader-search-panel';
-import { CascaderOption, CascaderOptionInfo } from './interface';
-import { isArray } from '../_utils/is';
-import { InputValueChangeReason } from '../select/select';
-import { Data } from '../_utils/types';
+import {
+  CascaderFieldNames,
+  CascaderOption,
+  CascaderOptionInfo,
+} from './interface';
+import { isArray, isFunction, isNull, isUndefined } from '../_utils/is';
+import { BaseType, Data, UnionType } from '../_utils/types';
 import { useSelectedPath } from './hooks/use-selected-path';
-import { CODE, getKeyDownHandler } from '../_utils/keyboard';
+import { KEYBOARD_KEY, getKeyDownHandler } from '../_utils/keyboard';
+import { cascaderInjectionKey } from './context';
+import { Size } from '../_utils/constant';
+import { debounce } from '../_utils/debounce';
+import { useFormItem } from '../_hooks/use-form-item';
+import { VirtualListProps } from '../_components/virtual-list-v2/interface';
 
 export default defineComponent({
   name: 'Cascader',
   components: {
     Trigger,
     SelectView,
-    CascaderPanel,
+    BaseCascaderPanel,
     CascaderSearchPanel,
   },
   inheritAttrs: false,
@@ -86,8 +144,8 @@ export default defineComponent({
       default: false,
     },
     /**
-     * @zh 是否为多选状态
-     * @en Whether it is a multi-selection state
+     * @zh 是否为多选状态（多选模式默认开启搜索）
+     * @en Whether it is a multi-selection state (The search is turned on by default in the multi-select mode)
      */
     multiple: {
       type: Boolean,
@@ -98,21 +156,39 @@ export default defineComponent({
      * @en Value
      */
     modelValue: {
-      type: [String, Array] as PropType<
-        string | string[] | undefined | (string | string[])[]
+      type: [String, Number, Object, Array] as PropType<
+        | string
+        | number
+        | Record<string, any>
+        | (
+            | string
+            | number
+            | Record<string, any>
+            | (string | number | Record<string, any>)[]
+          )[]
+        | undefined
       >,
     },
     /**
      * @zh 默认值（非受控状态）
      * @en Default value (uncontrolled state)
-     * @defaultValue '' | undefined | []
+     * @defaultValue '' \| undefined \| []
      */
     defaultValue: {
-      type: [String, Array] as PropType<
-        string | string[] | undefined | (string | string[])[]
+      type: [String, Number, Object, Array] as PropType<
+        | string
+        | number
+        | Record<string, any>
+        | (
+            | string
+            | number
+            | Record<string, any>
+            | (string | number | Record<string, any>)[]
+          )[]
+        | undefined
       >,
       default: (props: Data) =>
-        props.multiple ? [] : props.mode === 'value' ? '' : undefined,
+        props.multiple ? [] : props.pathMode ? undefined : '',
     },
     /**
      * @zh 级联选择器的选项
@@ -139,12 +215,22 @@ export default defineComponent({
       default: false,
     },
     /**
+     * @zh 选择框的大小
+     * @en The size of the select
+     * @values 'mini', 'small', 'medium', 'large'
+     * @defaultValue 'medium'
+     */
+    size: {
+      type: String as PropType<Size>,
+    },
+    /**
      * @zh 是否允许搜索
      * @en Whether to allow searching
+     * @defaultValue false (single) \| true (multiple)
      */
     allowSearch: {
       type: Boolean,
-      default: false,
+      default: (props: Data) => Boolean(props.multiple),
     },
     /**
      * @zh 是否允许清除
@@ -185,7 +271,7 @@ export default defineComponent({
      * @en Expand the trigger method of the next level
      */
     expandTrigger: {
-      type: String,
+      type: String as PropType<'click' | 'hover'>,
       default: 'click',
     },
     /**
@@ -201,9 +287,13 @@ export default defineComponent({
      * @en Placeholder
      */
     placeholder: String,
+    /**
+     * @zh 自定义选项过滤方法
+     * @en Custom options filter method
+     */
     filterOption: {
       type: Function as PropType<
-        (inputValue: string, optionInfo: CascaderOptionInfo) => boolean
+        (inputValue: string, option: CascaderOption) => boolean
       >,
     },
     /**
@@ -211,95 +301,352 @@ export default defineComponent({
      * @en Mount container for popup
      */
     popupContainer: {
-      type: [String, Object] as PropType<
-        string | HTMLElement | null | undefined
-      >,
+      type: [String, Object] as PropType<string | HTMLElement>,
+    },
+    /**
+     * @zh 多选模式下，最多显示的标签数量。0 表示不限制
+     * @en In multi-select mode, the maximum number of labels displayed. 0 means unlimited
+     */
+    maxTagCount: {
+      type: Number,
+      default: 0,
     },
     /**
      * @zh 格式化展示内容
      * @en Format display content
      */
     formatLabel: {
-      type: Function as PropType<(options: CascaderOptionInfo[]) => string>,
+      type: Function as PropType<(options: CascaderOption[]) => string>,
+    },
+    /**
+     * @zh 下拉菜单的触发器属性
+     * @en Trigger props of the drop-down menu
+     * @type TriggerProps
+     */
+    triggerProps: {
+      type: Object as PropType<TriggerProps>,
+    },
+    /**
+     * @zh 是否开启严格选择模式
+     * @en Whether to enable strict selection mode
+     */
+    checkStrictly: {
+      type: Boolean,
+      default: false,
+    },
+    /**
+     * @zh 数据懒加载函数，传入时开启懒加载功能
+     * @en Data lazy loading function, open the lazy loading function when it is passed in
+     * @version 2.13.0
+     */
+    loadMore: {
+      type: Function as PropType<
+        (
+          option: CascaderOption,
+          done: (children?: CascaderOption[]) => void
+        ) => void
+      >,
+    },
+    /**
+     * @zh 是否为加载中状态
+     * @en Whether it is loading state
+     * @version 2.15.0
+     */
+    loading: {
+      type: Boolean,
+      default: false,
+    },
+    /**
+     * @zh 搜索下拉菜单中的选项是否仅展示标签
+     * @en Whether the options in the search dropdown show only label
+     * @version 2.18.0
+     */
+    searchOptionOnlyLabel: {
+      type: Boolean,
+      default: false,
+    },
+    /**
+     * @zh 触发搜索事件的延迟时间
+     * @en Delay time to trigger search event
+     * @version 2.18.0
+     */
+    searchDelay: {
+      type: Number,
+      default: 500,
+    },
+    /**
+     * @zh 自定义 `CascaderOption` 中的字段
+     * @en Customize fields in `CascaderOption`
+     * @version 2.22.0
+     */
+    fieldNames: {
+      type: Object as PropType<CascaderFieldNames>,
+    },
+    /**
+     * @zh 用于确定选项键值的属性名
+     * @en Used to determine the option key value attribute name
+     * @version 2.29.0
+     */
+    valueKey: {
+      type: String,
+      default: 'value',
+    },
+    /**
+     * @zh 自定义不存在选项的值的展示
+     * @en Options that do not exist in custom values
+     * @version 2.29.0
+     */
+    fallback: {
+      type: [Boolean, Function] as PropType<
+        | boolean
+        | ((
+            value:
+              | string
+              | number
+              | Record<string, unknown>
+              | (string | number | Record<string, unknown>)[]
+          ) => string)
+      >,
+      default: true,
+    },
+    /**
+     * @zh 是否展开子菜单
+     * @en whether to expand the submenu
+     * @version 2.29.0
+     */
+    expandChild: {
+      type: Boolean,
+      default: false,
+    },
+    /**
+     * @zh 传递虚拟列表属性，传入此参数以开启虚拟滚动 [VirtualListProps](#VirtualListProps)
+     * @en Pass the virtual list attribute, pass in this parameter to turn on virtual scrolling [VirtualListProps](#VirtualListProps)
+     * @type VirtualListProps
+     * @version 2.49.0
+     */
+    virtualListProps: {
+      type: Object as PropType<VirtualListProps>,
+    },
+    /**
+     * @zh 标签内容不换行
+     * @en Tag content does not wrap
+     * @version 2.56.1
+     */
+    tagNowrap: {
+      type: Boolean,
+      default: false,
     },
   },
-  emits: [
-    'update:modelValue',
+  emits: {
+    'update:modelValue': (
+      value:
+        | string
+        | number
+        | Record<string, any>
+        | (
+            | string
+            | number
+            | Record<string, any>
+            | (string | number | Record<string, any>)[]
+          )[]
+        | undefined
+    ) => true,
+    'update:popupVisible': (visible: boolean) => true,
     /**
      * @zh 选中值改变时触发
      * @en Triggered when the selected value changes
-     * @property {string | string[] | undefined | (string | string[])[]} value
+     * @property {string | number | (string | number | (string | number)[])[] | undefined} value
      */
-    'change',
+    'change': (
+      value:
+        | string
+        | number
+        | Record<string, any>
+        | (
+            | string
+            | number
+            | Record<string, any>
+            | (string | number | Record<string, any>)[]
+          )[]
+        | undefined
+    ) => true,
     /**
      * @zh 输入值改变时触发
      * @en Triggered when the input value changes
      * @property {string} value
      */
-    'inputValueChange',
+    'inputValueChange': (value: string) => true,
     /**
      * @zh 点击清除按钮时触发
      * @en Triggered when the clear button is clicked
      */
-    'clear',
+    'clear': () => true,
     /**
      * @zh 用户搜索时触发
      * @en Triggered when the user searches
      * @property {string} value
      */
-    'search',
+    'search': (value: string) => true,
     /**
      * @zh 下拉框的显示状态改变时触发
      * @en Triggered when the display state of the dropdown changes
      * @property {boolean} visible
      */
-    'popupVisibleChange',
+    'popupVisibleChange': (visible: boolean) => true,
     /**
      * @zh 获得焦点时触发
      * @en Triggered when focus
+     * @param {FocusEvent} ev
      */
-    'focus',
+    'focus': (ev: FocusEvent) => true,
     /**
      * @zh 失去焦点时触发
      * @en Triggered when blur
+     * @param {FocusEvent} ev
      */
-    'blur',
-  ],
-  setup(props, { emit }) {
-    const { options } = toRefs(props);
+    'blur': (ev: FocusEvent) => true,
+  },
+  /**
+   * @zh 选择框的箭头图标
+   * @en Arrow icon for select box
+   * @slot arrow-icon
+   * @version 2.16.0
+   */
+  /**
+   * @zh 选择框的加载中图标
+   * @en Loading icon for select box
+   * @slot loading-icon
+   * @version 2.16.0
+   */
+  /**
+   * @zh 选择框的搜索图标
+   * @en Search icon for select box
+   * @slot search-icon
+   * @version 2.16.0
+   */
+  /**
+   * @zh 选项内容
+   * @en Display content of options
+   * @slot option
+   * @binding {CascaderOption} data
+   * @version 2.18.0
+   */
+  /**
+   * @zh 选择框的显示内容
+   * @en Display content of label
+   * @slot label
+   * @binding {CascaderOption} data
+   * @version 2.18.0
+   */
+  /**
+   * @zh 选项为空时的显示内容
+   * @en Display content when the option is empty
+   * @slot empty
+   * @version 2.23.0
+   */
+  /**
+   * @zh 前缀元素
+   * @en Prefix
+   * @slot prefix
+   * @version 2.23.0
+   */
+  setup(props, { emit, slots }) {
+    const {
+      options,
+      checkStrictly,
+      loadMore,
+      formatLabel,
+      modelValue,
+      disabled,
+      valueKey,
+      expandTrigger,
+      expandChild,
+      pathMode,
+      multiple,
+    } = toRefs(props);
     const _value = ref(props.defaultValue);
     const _inputValue = ref(props.defaultInputValue);
     const _popupVisible = ref(props.defaultPopupVisible);
 
+    const { mergedDisabled, eventHandlers } = useFormItem({ disabled });
+
+    watch(modelValue, (value) => {
+      if (isUndefined(value) || isNull(value)) {
+        _value.value = props.multiple ? [] : undefined;
+      }
+    });
+
     const optionInfos = ref<CascaderOptionInfo[]>([]);
-    const leafOptionSet = new Set<CascaderOptionInfo>();
-    const leafOptionMap = new Map<string, CascaderOptionInfo>();
-    const leafOptionValueMap = new Map<string, CascaderOptionInfo>();
+    const totalLevel = ref(1);
+
+    const optionMap = reactive(new Map<string, CascaderOptionInfo>());
+    const leafOptionMap = reactive(new Map<string, CascaderOptionInfo>());
+    const leafOptionValueMap = reactive(new Map<BaseType, string>());
+    const leafOptionSet = reactive(new Set<CascaderOptionInfo>());
+
+    const lazyLoadOptions = reactive<Record<string, CascaderOption[]>>({});
+
+    const addLazyLoadOptions = (children: CascaderOption[], key: string) => {
+      lazyLoadOptions[key] = children;
+    };
+
+    const DEFAULT_FIELD_NAMES = {
+      value: 'value',
+      label: 'label',
+      disabled: 'disabled',
+      children: 'children',
+      tagProps: 'tagProps',
+      render: 'render',
+      isLeaf: 'isLeaf',
+    };
+
+    const mergedFieldNames = computed(() => ({
+      ...DEFAULT_FIELD_NAMES,
+      ...props.fieldNames,
+    }));
 
     watch(
-      options,
-      (_options) => {
-        leafOptionSet.clear();
+      [options, lazyLoadOptions, mergedFieldNames],
+      ([_options, _lazyLoadOptions, _fieldNames]) => {
+        optionMap.clear();
         leafOptionMap.clear();
         leafOptionValueMap.clear();
-        optionInfos.value = getOptionInfos(props.options, {
+        leafOptionSet.clear();
+
+        optionInfos.value = getOptionInfos(_options ?? [], {
+          enabledLazyLoad: Boolean(props.loadMore),
+          lazyLoadOptions,
+          optionMap,
           leafOptionSet,
           leafOptionMap,
           leafOptionValueMap,
+          totalLevel,
+          checkStrictly,
+          valueKey,
+          fieldNames: _fieldNames,
         });
       },
       {
         immediate: true,
+        deep: true,
       }
     );
 
-    const computedKeys = computed(() =>
-      getKeysFromValue(props.modelValue ?? _value.value, {
+    const computedValueMap = computed(() => {
+      const values = getValidValues(props.modelValue ?? _value.value, {
+        multiple: props.multiple,
         pathMode: props.pathMode,
-        leafOptionMap,
-        leafOptionValueMap,
-      })
-    );
+      });
+      return new Map(
+        values.map((value) => [
+          getValueKey(value, {
+            valueKey: props.valueKey,
+            leafOptionValueMap,
+          }),
+          value,
+        ])
+      );
+    });
 
     const computedInputValue = computed(
       () => props.inputValue ?? _inputValue.value
@@ -308,41 +655,53 @@ export default defineComponent({
       () => props.popupVisible ?? _popupVisible.value
     );
 
-    const filteredLeafOptions = computed(() =>
-      Array.from(leafOptionSet).filter(
-        (item) =>
-          props.filterOption?.(computedInputValue.value, item) ??
-          item.label?.includes(computedInputValue.value)
-      )
-    );
+    const getFilteredStatus = (label: string) => {
+      return label
+        ?.toLocaleLowerCase()
+        .includes(computedInputValue.value?.toLocaleLowerCase());
+    };
 
-    const updateValue = (
-      options?: CascaderOptionInfo | CascaderOptionInfo[]
-    ) => {
-      let value: string | string[] | undefined | (string | string[])[];
-      if (!options) {
-        if (!props.pathMode) {
-          value = '';
+    const filteredLeafOptions = computed(() => {
+      const options = props.checkStrictly
+        ? Array.from(optionMap.values())
+        : Array.from(leafOptionSet);
+
+      return options.filter((item) => {
+        if (isFunction(props.filterOption)) {
+          return props.filterOption(computedInputValue.value, item.raw);
         }
+
+        if (props.checkStrictly) {
+          return getFilteredStatus(item.label);
+        }
+
+        return item.path?.find((leaf) => getFilteredStatus(leaf.label));
+      });
+    });
+
+    const updateValue = (values: UnionType[] | UnionType[][]) => {
+      const value = props.multiple ? values : values[0] ?? '';
+      if (values.length === 0) {
         setSelectedPath();
-        setActiveNode();
-      } else if (isArray(options)) {
-        value = options.map((item) => {
-          if (!props.pathMode) {
-            return item.value;
-          }
-          return item.path.map((item) => item.value);
-        });
-      } else if (!props.pathMode) {
-        value = options.value;
-      } else {
-        value = options.path.map((item) => item.value);
+        setActiveKey();
       }
 
       _value.value = value;
       emit('update:modelValue', value);
       emit('change', value);
+      eventHandlers.value?.onChange?.();
     };
+
+    watch([multiple, pathMode], () => {
+      const values: any[] = [];
+      computedValueMap.value.forEach((value, key) => {
+        const option = leafOptionMap.get(key);
+        if (option) {
+          values.push(pathMode.value ? option.pathValue : option.value);
+        }
+      });
+      updateValue(values);
+    });
 
     const handlePopupVisibleChange = (visible: boolean): void => {
       if (computedPopupVisible.value !== visible) {
@@ -356,27 +715,50 @@ export default defineComponent({
         const option = leafOptionMap.get(key);
         if (option) {
           selectMultiple(option, false);
+        } else {
+          const values: any[] = [];
+          computedValueMap.value.forEach((value, _key) => {
+            if (_key !== key) {
+              values.push(value);
+            }
+          });
+          updateValue(values);
         }
       }
     };
 
     const selectSingle = (option: CascaderOptionInfo) => {
-      updateValue(option);
+      updateValue([props.pathMode ? option.pathValue : option.value]);
       handlePopupVisibleChange(false);
     };
 
     const selectMultiple = (option: CascaderOptionInfo, checked: boolean) => {
-      const leafOptionKeys = getLeafOptionKeys(option);
+      if (checked) {
+        const leafOptionInfos = props.checkStrictly
+          ? [option]
+          : getLeafOptionInfos(option);
 
-      const newKeys = checked
-        ? computedKeys.value.concat(
-            leafOptionKeys.filter((item) => !computedKeys.value.includes(item))
-          )
-        : computedKeys.value.filter((item) => !leafOptionKeys.includes(item));
+        updateValue([
+          ...computedValueMap.value.values(),
+          ...leafOptionInfos
+            .filter((item) => !computedValueMap.value.has(item.key))
+            .map((item) => {
+              return props.pathMode ? item.pathValue : item.value;
+            }),
+        ]);
+      } else {
+        const leafOptionKeys = props.checkStrictly
+          ? [option.key]
+          : getLeafOptionKeys(option);
+        const values: any[] = [];
+        computedValueMap.value.forEach((value, key) => {
+          if (!leafOptionKeys.includes(key)) {
+            values.push(value);
+          }
+        });
+        updateValue(values);
+      }
 
-      updateValue(
-        newKeys.map((key) => leafOptionMap.get(key) as CascaderOptionInfo)
-      );
       handleInputValueChange('', 'optionChecked');
     };
 
@@ -391,14 +773,11 @@ export default defineComponent({
       }
     };
 
-    const getOptionLabel = (option: CascaderOptionInfo) => {
-      return option.path.map((item) => item.label).join(' / ');
-    };
+    const handleSearch = debounce((value: string) => {
+      emit('search', value);
+    }, props.searchDelay);
 
-    const handleInputValueChange = (
-      value: string,
-      reason: InputValueChangeReason
-    ): void => {
+    const handleInputValueChange = (value: string, reason: string): void => {
       if (value !== computedInputValue.value) {
         if (reason === 'manual' && !computedPopupVisible.value) {
           _popupVisible.value = true;
@@ -409,22 +788,27 @@ export default defineComponent({
         emit('inputValueChange', value);
 
         if (props.allowSearch) {
-          emit('search', value);
+          handleSearch(value);
         }
       }
     };
 
     watch(computedPopupVisible, (value) => {
       if (value) {
-        if (computedKeys.value.length > 0 && !activeNode.value) {
-          const lastKey = computedKeys.value[computedKeys.value.length - 1];
-          const node = leafOptionMap.get(lastKey);
-          if (node) {
-            setSelectedPath(node);
-            setActiveNode(node);
+        if (computedValueMap.value.size > 0) {
+          const keys = Array.from(computedValueMap.value.keys());
+          const lastKey = keys[keys.length - 1];
+          const option = leafOptionMap.get(lastKey);
+          if (option && option.key !== activeKey.value) {
+            setSelectedPath(option.key);
+            setActiveKey(option.key);
           }
         }
       } else {
+        if (computedValueMap.value.size === 0) {
+          setSelectedPath();
+          setActiveKey();
+        }
         handleInputValueChange('', 'optionListHide');
       }
     });
@@ -433,16 +817,16 @@ export default defineComponent({
       e.stopPropagation();
       if (props.multiple) {
         // 保留已经被选中但被disabled的选项值
-        const newValue = computedKeys.value.reduce((pre, key) => {
+        const newValues: any[] = [];
+        computedValueMap.value.forEach((value, key) => {
           const option = leafOptionMap.get(key);
           if (option?.disabled) {
-            pre.push(option);
+            newValues.push(props.pathMode ? option.pathValue : option.value);
           }
-          return pre;
-        }, [] as CascaderOptionInfo[]);
-        updateValue(newValue);
+        });
+        updateValue(newValues);
       } else {
-        updateValue();
+        updateValue([]);
       }
       handleInputValueChange('', 'manual');
       emit('clear');
@@ -452,55 +836,61 @@ export default defineComponent({
       () => props.allowSearch && computedInputValue.value.length > 0
     );
 
-    const handleFocus = (e: Event) => {
+    const handleFocus = (e: FocusEvent) => {
       emit('focus', e);
     };
-    const handleBlur = (e: Event) => {
+    const handleBlur = (e: FocusEvent) => {
       emit('blur', e);
     };
 
     const {
+      activeKey,
+      activeOption,
       selectedPath,
-      activeNode,
       displayColumns,
+      setActiveKey,
       setSelectedPath,
-      setActiveNode,
       getNextActiveNode,
-    } = useSelectedPath(optionInfos, { filteredLeafOptions, showSearchPanel });
+    } = useSelectedPath(optionInfos, {
+      optionMap,
+      filteredLeafOptions,
+      showSearchPanel,
+      expandChild,
+    });
 
-    // TODO: 添加滚动支持和虚拟列表
-    // const panelRef = ref();
-    //
-    // const scrollIntoView = (key: string, level: number) => {
-    //   const wrapperEle = panelRef.value?.$refs?.panelRefs?.[
-    //     level
-    //   ] as HTMLElement;
-    //   const optionEle = panelRef.value?.$refs?.optionRefs?.[key] as HTMLElement;
-    //
-    //   if (!wrapperEle || !optionEle) {
-    //     return;
-    //   }
-    //   if (wrapperEle.scrollHeight === wrapperEle.offsetHeight) {
-    //     return;
-    //   }
-    //   const optionRect = getRelativeRect(optionEle, wrapperEle);
-    //   const wrapperScrollTop = wrapperEle.scrollTop;
-    //
-    //   if (optionRect.top < 0) {
-    //     wrapperEle.scrollTo(0, wrapperScrollTop + optionRect.top);
-    //   } else if (optionRect.bottom < 0) {
-    //     wrapperEle.scrollTo(0, wrapperScrollTop - optionRect.bottom);
-    //   }
-    // };
+    provide(
+      cascaderInjectionKey,
+      reactive({
+        onClickOption: handleClickOption,
+        setActiveKey,
+        setSelectedPath,
+        loadMore,
+        expandTrigger,
+        addLazyLoadOptions,
+        formatLabel,
+        slots,
+        valueMap: computedValueMap,
+      })
+    );
 
     const handleKeyDown = getKeyDownHandler(
       new Map([
         [
-          CODE.ENTER,
-          (e) => {
+          KEYBOARD_KEY.ENTER,
+          (ev: Event) => {
             if (computedPopupVisible.value) {
-              if (activeNode.value) {
-                handleClickOption(activeNode.value);
+              if (activeOption.value) {
+                let checked: boolean;
+                if (props.checkStrictly || activeOption.value.isLeaf) {
+                  checked = !computedValueMap.value.has(activeOption.value.key);
+                } else {
+                  checked = !getCheckedStatus(
+                    activeOption.value,
+                    computedValueMap.value
+                  ).checked;
+                }
+                setSelectedPath(activeOption.value.key);
+                handleClickOption(activeOption.value, checked);
               }
             } else {
               handlePopupVisibleChange(true);
@@ -508,100 +898,102 @@ export default defineComponent({
           },
         ],
         [
-          CODE.ESC,
-          (e) => {
+          KEYBOARD_KEY.ESC,
+          (ev: Event) => {
             handlePopupVisibleChange(false);
           },
         ],
         [
-          CODE.ARROW_DOWN,
-          (e) => {
+          KEYBOARD_KEY.ARROW_DOWN,
+          (ev: Event) => {
+            ev.preventDefault();
             const activeNode = getNextActiveNode('next');
-            setActiveNode(activeNode);
-            e?.preventDefault();
+            setActiveKey(activeNode?.key);
           },
         ],
         [
-          CODE.ARROW_UP,
-          (e) => {
+          KEYBOARD_KEY.ARROW_UP,
+          (ev: Event) => {
+            ev.preventDefault();
             const activeNode = getNextActiveNode('preview');
-            setActiveNode(activeNode);
-            e?.preventDefault();
+            setActiveKey(activeNode?.key);
           },
         ],
         [
-          CODE.ARROW_RIGHT,
-          (e) => {
-            if (activeNode.value?.children) {
-              setSelectedPath(activeNode.value);
-              setActiveNode(activeNode.value?.children[0]);
+          KEYBOARD_KEY.ARROW_RIGHT,
+          (ev: Event) => {
+            if (!showSearchPanel.value) {
+              ev.preventDefault();
+              if (activeOption.value?.children) {
+                setSelectedPath(activeOption.value.key);
+                setActiveKey(activeOption.value.children[0]?.key);
+              }
             }
-            e?.preventDefault();
           },
         ],
         [
-          CODE.ARROW_LEFT,
-          (e) => {
-            if (activeNode.value?.parent) {
-              setActiveNode(activeNode.value?.parent);
-              setSelectedPath(activeNode.value?.parent);
+          KEYBOARD_KEY.ARROW_LEFT,
+          (ev: Event) => {
+            if (!showSearchPanel.value) {
+              ev.preventDefault();
+              if (activeOption.value?.parent) {
+                setSelectedPath(activeOption.value.parent.key);
+                setActiveKey(activeOption.value.parent.key);
+              }
             }
-            e?.preventDefault();
           },
         ],
       ])
     );
 
     const selectViewValue = computed(() => {
-      if (props.multiple) {
-        const result = [];
-        for (const key of computedKeys.value) {
-          const option = leafOptionMap.get(key);
-          if (option) {
-            const value = {
-              value: key,
-              label: getOptionLabel(option),
-              closable: !option.disabled,
-            };
-            result.push(value);
-          }
+      const result: any[] = [];
+      computedValueMap.value.forEach((value, key) => {
+        const option = leafOptionMap.get(key);
+        if (option) {
+          result.push({
+            value: key,
+            label:
+              props.formatLabel?.(option.path.map((item) => item.raw)) ??
+              getOptionLabel(option),
+            closable: !option.disabled,
+            tagProps: option.tagProps,
+          });
+        } else if (props.fallback) {
+          const label = isFunction(props.fallback)
+            ? props.fallback(value)
+            : isArray(value)
+            ? value.join(' / ')
+            : String(value);
+          result.push({
+            value: key,
+            label,
+            closable: true,
+          });
         }
-        return result;
-      }
-      const option = leafOptionMap.get(computedKeys.value[0]);
-
-      if (!option) {
-        return undefined;
-      }
-
-      return {
-        value: option.key,
-        label: props.formatLabel?.(option.path) ?? getOptionLabel(option),
-        closable: !option?.disabled,
-      };
+      });
+      return result;
     });
 
     return {
       optionInfos,
-      computedKeys,
       filteredLeafOptions,
       selectedPath,
-      activeNode,
+      activeKey,
       displayColumns,
       computedInputValue,
       computedPopupVisible,
       handleClear,
-      setSelectedPath,
-      setActiveNode,
       selectViewValue,
       handleInputValueChange,
       showSearchPanel,
       handlePopupVisibleChange,
       handleFocus,
-      handleClickOption,
       handleBlur,
       handleRemove,
+      mergedDisabled,
       handleKeyDown,
+      totalLevel,
     };
   },
 });
